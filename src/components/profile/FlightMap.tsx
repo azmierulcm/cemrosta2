@@ -37,10 +37,6 @@ const FlightMap = ({ events }: { events: DutyEvent[] }) => {
           loading="lazy"
           allowFullScreen
           referrerPolicy="no-referrer-when-downgrade"
-          src={`https://www.google.com/maps/embed/v1/place?key=REPLACE_WITH_FREE_KEY_OR_USE_SEARCH_EMBED&q=${query}`}
-          // Since we want to avoid API keys, we'll use the "Search" embed which is often more lenient
-          // or a standard Search URL if the embed requires a key.
-          // Let's use the standard Search URL embed style:
           src={`https://maps.google.com/maps?q=${query}&t=&z=5&ie=UTF8&iwloc=&output=embed`}
         ></iframe>
         
