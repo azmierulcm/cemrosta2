@@ -5,12 +5,14 @@ import Navbar from '@/components/Navbar';
 import MarketplaceCard from '@/components/marketplace/MarketplaceCard';
 import CreateAdModal from '@/components/marketplace/CreateAdModal';
 import ListingDetailModal from '@/components/marketplace/ListingDetailModal';
-import { Search, SlidersHorizontal, Plus, Loader2, PackageOpen } from 'lucide-react';
+import { Search, Plus, Loader2, PackageOpen } from 'lucide-react';
 import { supabase } from '@/utils/supabase';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const CATEGORIES = ["All", "Headsets", "Luggage", "Watches", "Uniforms", "Manuals"];
 
 export default function MarketplacePage() {
+  const { user, openAuthModal } = useAuthStore();
   const [listings, setListings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
@@ -62,11 +64,11 @@ export default function MarketplacePage() {
             <p className="text-xl text-gray-500 font-medium italic">Elite gear for elite crew.</p>
           </div>
           <button 
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => user ? setIsCreateModalOpen(true) : openAuthModal('signup')}
             className="bg-rausch text-white px-10 py-5 rounded-2xl font-black shadow-xl shadow-rausch/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3"
           >
             <Plus size={20} strokeWidth={3} />
-            Sell an Item
+            {user ? 'Sell an Item' : 'Join to Sell'}
           </button>
         </div>
 

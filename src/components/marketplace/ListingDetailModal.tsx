@@ -21,29 +21,35 @@ interface Listing {
 }
 
 const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: Listing | null, isOpen: boolean, onClose: () => void }) => {
-  const [currentImg, setCurrentImg] = useState(0);
+  const [currentImg, setCurrentImg] = React.useState(0);
 
-  if (!isOpen || !listing) return null;
+  // Reset image index when listing changes
+  React.useEffect(() => {
+    setCurrentImg(0);
+  }, [listing?.id]);
 
-  const images = listing.image_urls.length > 0 ? listing.image_urls : ["https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800"];
+  const images = (listing.image_urls && listing.image_urls.length > 0) 
+    ? listing.image_urls 
+    : ["https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800"];
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/80 backdrop-blur-md"
-        />
-        
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white w-full max-w-5xl md:rounded-[3rem] relative z-10 shadow-2xl overflow-hidden flex flex-col md:flex-row h-full md:h-[80vh]"
-        >
+      {isOpen && listing && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 text-left">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+          />
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="bg-white w-full max-w-5xl md:rounded-[3rem] relative z-10 shadow-2xl overflow-hidden flex flex-col md:flex-row h-full md:h-[80vh]"
+          >
           <button 
             onClick={onClose} 
             className="absolute top-6 right-6 z-50 p-3 bg-white/90 backdrop-blur-md hover:bg-white rounded-full transition-all shadow-xl border border-gray-100"

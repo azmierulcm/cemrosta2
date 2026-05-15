@@ -30,14 +30,16 @@ const CreateAdModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => vo
       return;
     }
 
-    setImages(prev => [...prev, ...files]);
-    
-    // Create previews
+    // Create previews and store files
     const newPreviews = files.map(file => URL.createObjectURL(file));
+    setImages(prev => [...prev, ...files]);
     setPreviews(prev => [...prev, ...newPreviews]);
   };
 
   const removeImage = (index: number) => {
+    // Revoke the URL to prevent memory leaks
+    URL.revokeObjectURL(previews[index]);
+    
     setImages(prev => prev.filter((_, i) => i !== index));
     setPreviews(prev => prev.filter((_, i) => i !== index));
   };
