@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plane, User, Menu, X, Upload } from 'lucide-react';
+import { User, Menu, X, Upload, LayoutDashboard, Calendar, MapPinned, ShoppingBag, Settings as SettingsIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { supabase } from '@/lib/utils/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 
 const Navbar = () => {
   const { user, setUser, openAuthModal } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -17,8 +19,18 @@ const Navbar = () => {
   };
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (pathname === '/') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
+
+  const navLinks = [
+    { label: 'Dashboard', href: '/', icon: LayoutDashboard, authRequired: true },
+    { label: 'Calendar', href: '/calendar', icon: Calendar, authRequired: true },
+    { label: 'Passport', href: '/profile', icon: MapPinned, authRequired: true },
+    { label: 'Marketplace', href: '/marketplace', icon: ShoppingBag, authRequired: true },
+    { label: 'Settings', href: '/settings', icon: SettingsIcon, authRequired: true },
+  ];
 
   return (
     <nav className="fixed top-0 w-full bg-bg/80 backdrop-blur-md border-b border-border z-50">
@@ -27,6 +39,7 @@ const Navbar = () => {
           <Link 
             href="/" 
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            onClick={scrollToTop}
           >
             {/* Abstract Runway Logo */}
             <div className="flex flex-col gap-1">
@@ -41,12 +54,18 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-4 font-medium text-sm text-text-muted">
             {user ? (
               <>
-                <Link href="/profile" className="flex items-center gap-2 hover:text-text transition-colors group px-4 py-2">
-                  <div className="p-1.5 rounded-full bg-surface group-hover:bg-accent/10 group-hover:text-accent transition-colors">
-                    <User size={16} />
-                  </div>
-                  My Passport
-                </Link>
+                <div className="flex items-center gap-2 mr-4">
+                  {navLinks.map((link) => (
+                    <Link 
+                      key={link.href}
+                      href={link.href}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${pathname === link.href ? 'text-accent bg-accent/10' : 'hover:text-text hover:bg-surface'}`}
+                    >
+                      <link.icon size={18} />
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
                 <button 
                   onClick={handleSignOut}
                   className="bg-surface text-text border border-border px-6 py-2.5 rounded-xl hover:bg-surface-2 transition-all active:scale-95 font-bold"
@@ -96,14 +115,19 @@ const Navbar = () => {
           >
             {user ? (
               <>
-                <Link 
-                  href="/profile" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-3 w-full px-4 py-4 text-text font-bold bg-surface rounded-2xl"
-                >
-                  <User size={20} />
-                  My Passport
-                </Link>
+                <div className="grid grid-cols-1 gap-2">
+                  {navLinks.map((link) => (
+                    <Link 
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-4 rounded-2xl font-bold ${pathname === link.href ? 'text-accent bg-accent/10' : 'text-text bg-surface'}`}
+                    >
+                      <link.icon size={20} />
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
                 <button 
                   onClick={() => {
                     handleSignOut();

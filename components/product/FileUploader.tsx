@@ -5,10 +5,12 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Loader2, AlertCircle, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRoster } from '@/lib/contexts/RosterContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { parseRoster } from '@/lib/actions/parseRoster';
 
 const FileUploader = () => {
   const { isLoading, setLoading, error, setError, setRoster } = useRoster();
+  const { user } = useAuth();
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -20,6 +22,9 @@ const FileUploader = () => {
     // Create FormData for the Server Action
     const formData = new FormData();
     formData.append('file', file);
+    if (user?.id) {
+      formData.append('userId', user.id);
+    }
 
     try {
       const result = await parseRoster(formData);

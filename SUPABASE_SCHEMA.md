@@ -12,6 +12,8 @@ create table profiles (
   bio text,
   avatar_url text,
   gallery_urls text[], -- Array of 5 photo URLs for the Bento Grid
+  verified_at timestamp with time zone, -- set on first successful roster parse
+  active_listings_count integer default 0, -- max 5
   created_at timestamp with time zone default now()
 );
 ```
@@ -26,12 +28,41 @@ create table marketplace_listings (
   description text,
   price numeric not null,
   currency text default 'MYR',
-  category text, -- 'Headsets', 'Luggage', 'Watches', etc.
-  condition text, -- 'New', 'Lightly Used', 'Well Used'
+  category text, -- 'Headsets', 'Luggage', 'Watches', 'Uniforms', 'Manuals', 'Other'
+  condition text, -- 'New', 'Lightly used', 'Well used', 'For parts'
   image_urls text[], -- Array of product image URLs
-  status text default 'available', -- 'available', 'sold', 'hidden'
+  status text default 'available', -- 'available', 'sold', 'hidden', 'expired'
+  expires_at timestamp with time zone default (now() + interval '30 days'),
+  reports_count integer default 0,
+  contact_preference text default 'WhatsApp', -- 'WhatsApp', 'Email', 'In-app'
   created_at timestamp with time zone default now()
 );
+
+create table marketplace_reports (
+  id uuid default uuid_generate_v4() primary key,
+  listing_id uuid references marketplace_listings(id) on delete cascade not null,
+  reporter_id uuid references profiles(id) not null,
+  reason text not null, -- 'spam', 'fraud', 'inappropriate', 'other'
+  details text,
+  created_at timestamp with time zone default now()
+);
+
+create table waitlist_entries (
+  id uuid default uuid_generate_v4() primary key,
+  email text not null,
+  airline_name text not null,
+  created_at timestamp with time zone default now()
+);
+
+-- Functions & Triggers
+create or replace function increment_listing_count(user_id uuid)
+returns void as $$
+begin
+  update profiles
+  set active_listings_count = active_listings_count + 1
+  where id = user_id;
+end;
+$$ language plpgsql;
 ```
 
 ## 3. Storage Buckets

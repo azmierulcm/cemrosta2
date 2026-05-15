@@ -3,9 +3,12 @@
 import { getDocumentProxy, extractText } from 'unpdf';
 import { parseRosterText } from '@/lib/parser';
 import { RosterData, DutyEvent } from '@/lib/types';
+import { supabase } from '@/lib/utils/supabase';
 
 export async function parseRoster(formData: FormData): Promise<RosterData> {
   const file = formData.get('file') as File;
+  const userId = formData.get('userId') as string;
+  
   if (!file) throw new Error('No file uploaded');
 
   const arrayBuffer = await file.arrayBuffer();
@@ -17,7 +20,7 @@ export async function parseRoster(formData: FormData): Promise<RosterData> {
     
     const parsed = parseRosterText(text);
     
-    // Map ParsedRoster to RosterData (legacy support during transition)
+    // Map ParsedRoster to RosterData (legacy support)
     const events: DutyEvent[] = parsed.duties.map(d => ({
       id: d.id,
       type: d.type as any,
@@ -32,6 +35,17 @@ export async function parseRoster(formData: FormData): Promise<RosterData> {
       hotel: d.flight?.hotel,
       description: d.description,
     }));
+
+    // Verification Logic: Set verified_at and airline if userId is provided
+    if (userId) {
+      await supabase
+        .from('profiles')
+        .update({ 
+          verified_at: new Date().toISOString(),
+          airline: parsed.airline 
+        })
+        .eq('id', userId);
+    }
 
     return {
       events,

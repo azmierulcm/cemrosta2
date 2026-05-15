@@ -34,8 +34,13 @@ const PricingCTA = () => {
             Upload your roster
           </button>
 
-          <div className="mt-12 text-[10px] font-bold text-text-subtle uppercase tracking-[0.4em] font-mono">
-            // FREE FOREVER FOR INDIVIDUAL CREW
+          <div className="mt-12 space-y-6">
+            <p className="text-text-muted font-medium italic">
+              Crew members get access to a verified marketplace for headsets, luggage, manuals, and uniforms.
+            </p>
+            <div className="text-[10px] font-bold text-text-subtle uppercase tracking-[0.4em] font-mono">
+              // FREE FOREVER FOR INDIVIDUAL CREW
+            </div>
           </div>
         </motion.div>
       </div>
