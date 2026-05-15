@@ -31,10 +31,28 @@ const StatCard = ({ label, value, sub, icon: Icon }: any) => (
 
 import Link from 'next/link';
 
+import CrewCard from './CrewCard';
+
 const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) => {
   const { user } = useAuthStore();
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
   const earnedSet = new Set(earnedAchievements);
+
+  const mockProfile = {
+    id: 'demo',
+    user_id: 'demo',
+    display_name: 'Muhammad Azmierul',
+    rank: 'First Officer' as any,
+    base_iata: 'KUL',
+    airline_code: 'MH',
+    aircraft_types: ['A350', 'A330'],
+    handle: 'azmierul.fo',
+    avatar_url: null,
+    hire_date: '2020-05-15',
+    birthday: null,
+    privacy_mode: 'public' as any,
+    created_at: new Date().toISOString()
+  };
 
   return (
     <div className="bg-passport-bg min-h-screen text-passport-text p-10 font-sans selection:bg-passport-gold/30">
@@ -104,6 +122,28 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
                  />
                ))}
             </div>
+
+            {/* Crew Trading Card Feature */}
+            <div className="bg-passport-surface/20 rounded-[3rem] p-12 border border-passport-border/40 flex flex-col md:flex-row items-center gap-12 mt-20">
+               <div className="scale-75 md:scale-100 origin-center shrink-0">
+                  <CrewCard profile={mockProfile as any} stats={stats} />
+               </div>
+               <div className="flex-1 text-center md:text-left">
+                  <h3 className="text-3xl font-black mb-4 tracking-tight text-white uppercase italic">Your Digital Asset.</h3>
+                  <p className="text-passport-secondary text-lg font-medium leading-relaxed mb-10 opacity-80">
+                     A persistent, shareable identity card that carries your career stats. 
+                     Exchange with colleagues to build your global aviation network.
+                  </p>
+                  <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                     <button className="bg-passport-gold text-passport-bg px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:scale-105 transition-all shadow-xl shadow-passport-gold/20">
+                        Exchange Card
+                     </button>
+                     <button className="bg-white/10 text-white border border-white/20 px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-white/20 transition-all">
+                        Download PNG
+                     </button>
+                  </div>
+               </div>
+            </div>
           </div>
 
           {/* Right: Sidebar Content */}
@@ -148,6 +188,23 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
                         Rare Badge
                      </div>
                   </div>
+              </div>
+            </div>
+
+            {/* Final Flight / Retirement CTA */}
+            <div>
+               <h3 className="text-[10px] font-bold text-passport-secondary uppercase tracking-[0.4em] mb-10 border-b border-passport-border pb-6">
+                Career Horizon
+              </h3>
+              <div className="bg-black p-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-passport-gold opacity-30" />
+                  <h4 className="text-xl font-black text-white mb-4 italic">The Final Sector.</h4>
+                  <p className="text-passport-text-tertiary text-xs font-medium leading-relaxed mb-8">
+                     Unlock the ceremonial black-and-gold card to commemorate your retirement mission.
+                  </p>
+                  <button className="text-passport-gold font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 group-hover:gap-4 transition-all">
+                     Request Certificate <ChevronRight size={14} />
+                  </button>
               </div>
             </div>
           </div>
