@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface Listing {
@@ -18,16 +18,18 @@ interface Listing {
 }
 
 const MarketplaceCard = ({ listing }: { listing: Listing }) => {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <motion.div
-      whileHover={{ y: -8 }}
+      whileHover={shouldReduceMotion ? {} : { y: -8 }}
       className="group cursor-pointer"
     >
       <div className="aspect-square rounded-[2rem] overflow-hidden mb-4 relative shadow-sm border border-border">
         <img 
           src={listing.image} 
           alt={listing.title} 
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          className={`w-full h-full object-cover transition-transform duration-500 ${shouldReduceMotion ? '' : 'group-hover:scale-110'}`}
         />
         <div className="absolute top-4 left-4 flex flex-col gap-2">
            <div className="bg-bg/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-text shadow-sm border border-border">

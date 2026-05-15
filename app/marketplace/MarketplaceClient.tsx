@@ -9,6 +9,7 @@ import { Search, Plus, Loader2, PackageOpen, ShieldCheck, AlertTriangle } from '
 import { supabase } from '@/lib/utils/supabase';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { trackEvent } from '@/lib/analytics/events';
 
 const CATEGORIES = ["All", "Headsets", "Luggage", "Watches", "Uniforms", "Manuals", "Other"];
 const CONDITIONS = ["All", "New", "Lightly used", "Well used", "For parts"];
@@ -84,7 +85,7 @@ export default function MarketplaceClient() {
   }
 
   return (
-    <main className="min-h-screen bg-bg pb-32">
+    <main id="main-content" className="min-h-screen bg-bg pb-32">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 pt-32">
@@ -190,7 +191,14 @@ export default function MarketplaceClient() {
         ) : listings.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
             {listings.map((item) => (
-              <div key={item.id} onClick={() => setSelectedListing(item)} className="cursor-pointer">
+              <div 
+                key={item.id} 
+                onClick={() => {
+                  setSelectedListing(item);
+                  trackEvent('MARKETPLACE_LISTING_VIEWED', { listing_id: item.id });
+                }} 
+                className="cursor-pointer"
+              >
                 <MarketplaceCard listing={{
                   ...item,
                   image: (item.image_urls && item.image_urls.length > 0) ? item.image_urls[0] : "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800",

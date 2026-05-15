@@ -96,7 +96,7 @@ const Navbar = () => {
           <div className="md:hidden">
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-text-muted hover:text-text transition-colors"
+              className="p-3 -mr-3 text-text-muted hover:text-text transition-colors"
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>

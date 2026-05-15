@@ -4,6 +4,8 @@ import { getDocumentProxy, extractText } from 'unpdf';
 import { parseRosterText } from '@/lib/parser';
 import { RosterData, DutyEvent } from '@/lib/types';
 import { supabase } from '@/lib/utils/supabase';
+// Server-side tracking would normally go here
+// import { trackServerEvent } from '@/lib/analytics/server';
 
 export async function parseRoster(formData: FormData): Promise<RosterData> {
   const file = formData.get('file') as File;

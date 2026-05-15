@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, MessageCircle, ShieldCheck, AlertTriangle, Flag, Clock } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { trackEvent } from '@/lib/analytics/events';
 
 interface Listing {
   id: string;
@@ -60,6 +61,7 @@ const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: Listing | n
         reason: reportReason,
         details: reportDetails
       });
+      trackEvent('MARKETPLACE_REPORT_SUBMITTED', { listing_id: listing.id, reason: reportReason });
       setReportSuccess(true);
       setTimeout(() => {
         setIsReporting(false);

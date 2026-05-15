@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle2, ShieldCheck, Zap, Heart } from 'lucide-react';
 import HeroAnimation from './HeroAnimation';
 import FileUploader from '../product/FileUploader';
@@ -15,6 +15,7 @@ const FORMAT_PILLS = [
 ];
 
 const LandingHero = () => {
+  const shouldReduceMotion = useReducedMotion();
   const [waitlistAirline, setWaitlistAirline] = useState<string | null>(null);
   const rostersProcessed = 1242; // Seeded constant + real count logic would go here
 
@@ -25,7 +26,7 @@ const LandingHero = () => {
 
       <div className="max-w-5xl mx-auto text-center flex-1 flex flex-col items-center">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
@@ -41,7 +42,7 @@ const LandingHero = () => {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
+          initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.6 }}
           className="w-full max-w-2xl mb-12"

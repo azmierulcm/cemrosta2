@@ -6,18 +6,20 @@ import Footer from '@/components/shared/Footer';
 import ProfileFilled from '@/components/product/profile/ProfileFilled';
 import ProfileEmptyState from '@/components/product/profile/ProfileEmptyState';
 import { useRoster } from '@/lib/contexts/RosterContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { SAMPLE_PROFILE } from '@/lib/fixtures/sample-profile';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ProfileClient() {
   const { roster } = useRoster();
+  const { profile } = useAuth();
   
   // map real roster to profile structure (simplified for Phase 3)
   const realProfileData = roster ? {
-    name: roster.crewName || 'Crew Member',
-    role: 'First Officer', // placeholder for now
+    name: profile?.full_name || roster.crewName || 'Crew Member',
+    role: profile?.rank || 'Crew Member',
     homeBase: 'KUL',
-    aircraftType: 'B737', // placeholder
+    aircraftType: profile?.fleet || 'B737',
     lifetimeStats: {
       sectors: roster.stats?.totalSectors || 0,
       blockMinutes: roster.events.reduce((acc, e) => {
@@ -46,7 +48,7 @@ export default function ProfileClient() {
   } : null;
 
   return (
-    <main className="min-h-screen bg-bg flex flex-col relative">
+    <main id="main-content" className="min-h-screen bg-bg flex flex-col relative">
       <Navbar />
       
       <div className="flex-1">

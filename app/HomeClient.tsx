@@ -57,7 +57,7 @@ export default function HomeClient() {
   }, [setUser]);
 
   return (
-    <main className="min-h-screen bg-bg selection:bg-accent/30 selection:text-accent-fg flex flex-col">
+    <main id="main-content" className="min-h-screen bg-bg selection:bg-accent/30 selection:text-accent-fg flex flex-col">
       <Navbar />
       <AuthModal />
       

@@ -3,12 +3,13 @@
 import React, { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Loader2, AlertCircle, XCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { parseRoster } from '@/lib/actions/parseRoster';
 
 const FileUploader = () => {
+  const shouldReduceMotion = useReducedMotion();
   const { isLoading, setLoading, error, setError, setRoster } = useRoster();
   const { user } = useAuth();
 
@@ -49,8 +50,8 @@ const FileUploader = () => {
     <div className="max-w-2xl mx-auto px-4">
       <div {...getRootProps()}>
         <motion.div
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
+          whileHover={shouldReduceMotion ? {} : { scale: 1.01 }}
+          whileTap={shouldReduceMotion ? {} : { scale: 0.99 }}
           className={`
             relative cursor-pointer rounded-3xl border-2 border-dashed transition-all duration-300
             p-12 flex flex-col items-center justify-center gap-4
