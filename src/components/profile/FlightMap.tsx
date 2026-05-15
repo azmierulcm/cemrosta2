@@ -1,8 +1,19 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { DutyEvent } from '@/types';
 import { MapPin, ExternalLink } from 'lucide-react';
+
+// Dynamically import Leaflet map to avoid SSR "window is not defined" issues
+const LeafletMap = dynamic(() => import('./LeafletMap'), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full bg-gray-50 flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-rausch/20 border-t-rausch rounded-full animate-spin" />
+    </div>
+  )
+});
 
 const IATA_CITIES: Record<string, string> = {
   'KUL': 'Kuala Lumpur International Airport',
@@ -22,28 +33,16 @@ const FlightMap = ({ events }: { events: DutyEvent[] }) => {
       .filter((p): p is string => !!p && !!IATA_CITIES[p])
   ));
 
-  // Default to KUL if no ports found
-  const primaryCity = uniquePorts[0] || 'KUL';
-  const query = encodeURIComponent(IATA_CITIES[primaryCity]);
-
   return (
     <div className="space-y-6 mb-16">
-      {/* Google Maps Iframe */}
+      {/* Interactive World Map */}
       <div className="w-full h-[500px] rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-card bg-gray-50 relative">
-        <iframe
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          loading="lazy"
-          allowFullScreen
-          referrerPolicy="no-referrer-when-downgrade"
-          src={`https://maps.google.com/maps?q=${query}&t=&z=5&ie=UTF8&iwloc=&output=embed`}
-        ></iframe>
+        <LeafletMap events={events} />
         
-        <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-white shadow-sm z-10">
+        <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-white shadow-sm z-10 pointer-events-none">
           <p className="text-[10px] font-black text-gray-900 flex items-center gap-2 tracking-widest uppercase">
               <MapPin size={12} className="text-rausch" />
-              Interactive Mission Map
+              Interactive Mission Tracker
           </p>
         </div>
       </div>
