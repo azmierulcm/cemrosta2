@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Plane, Globe, Award, Calendar, ChevronRight } from 'lucide-react';
+import { Plane, Globe, Award, Calendar, ChevronRight, Play } from 'lucide-react';
 import { CrewStats } from '@/types/passport';
 import ShareModal from './ShareModal';
 import AchievementBadge from './AchievementBadge';
@@ -29,6 +29,8 @@ const StatCard = ({ label, value, sub, icon: Icon }: any) => (
   </div>
 );
 
+import Link from 'next/link';
+
 const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) => {
   const { user } = useAuthStore();
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
@@ -46,15 +48,24 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
               <span className="text-passport-secondary italic font-serif font-light">Summary.</span>
             </h1>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsShareModalOpen(true)}
-            className="bg-passport-gold text-passport-bg px-10 py-5 rounded-2xl font-black text-lg shadow-2xl shadow-passport-gold/20 flex items-center gap-3 transition-all"
-          >
-            Generate this year&apos;s card
-            <ChevronRight size={20} strokeWidth={3} />
-          </motion.button>
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/passport/story/year-in-air"
+              className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-3 hover:bg-white/20 transition-all shadow-xl"
+            >
+              Watch 2026 Story
+              <Play size={20} fill="currentColor" />
+            </Link>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsShareModalOpen(true)}
+              className="bg-passport-gold text-passport-bg px-10 py-5 rounded-2xl font-black text-lg shadow-2xl shadow-passport-gold/20 flex items-center gap-3 transition-all"
+            >
+              Share Passport
+              <ChevronRight size={20} strokeWidth={3} />
+            </motion.button>
+          </div>
         </div>
 
         <ShareModal 
