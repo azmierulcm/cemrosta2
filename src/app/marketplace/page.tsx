@@ -112,7 +112,7 @@ export default function MarketplacePage() {
               <div key={item.id} onClick={() => setSelectedListing(item)}>
                 <MarketplaceCard listing={{
                   ...item,
-                  image: item.image_urls[0] || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800",
+                  image: (item.image_urls && item.image_urls.length > 0) ? item.image_urls[0] : "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800",
                   seller: item.profiles?.full_name || "Crew Member",
                   avatar: item.profiles?.avatar_url || `https://i.pravatar.cc/150?u=${item.seller_id}`
                 }} />
