@@ -12,19 +12,36 @@ import FileUploader from '@/components/FileUploader';
 import { useRosterStore } from '@/store/useRosterStore';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// Mock auth state - in real app this comes from Supabase
-const IS_LOGGED_IN = false; 
+import AuthModal from '@/components/AuthModal';
+import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/utils/supabase';
 
 export default function Home() {
   const { roster } = useRosterStore();
+  const { user, setUser } = useAuthStore();
+
+  React.useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [setUser]);
 
   return (
     <main className="min-h-screen bg-white">
       <Navbar />
+      <AuthModal />
       
       <AnimatePresence mode="wait">
         {/* Scenario 1: User is not logged in - Show Landing Page */}
-        {!IS_LOGGED_IN && !roster ? (
+        {!user && !roster ? (
           <motion.div
             key="landing"
             initial={{ opacity: 0 }}

@@ -4,9 +4,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRosterStore } from '@/store/useRosterStore';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const LandingHero = () => {
   const loadSampleRoster = useRosterStore((state) => state.loadSampleRoster);
+  const openAuthModal = useAuthStore((state) => state.openAuthModal);
 
   return (
     <section className="pt-40 pb-24 px-4 overflow-hidden">
@@ -47,6 +49,7 @@ const LandingHero = () => {
           className="flex flex-col md:flex-row items-center justify-center gap-6"
         >
           <button 
+            onClick={() => openAuthModal('signup')}
             className="bg-rausch text-white px-10 py-5 rounded-2xl text-lg font-black shadow-2xl shadow-rausch/30 hover:scale-105 active:scale-95 transition-all w-full md:w-auto text-center"
           >
             Sign Up Now →
