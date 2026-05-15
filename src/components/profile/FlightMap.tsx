@@ -1,8 +1,17 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Line,
+  Marker
+} from 'react-simple-maps';
 import { DutyEvent } from '@/types';
-import { MapPin, Plane } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 const IATA_COORDS: Record<string, [number, number]> = {
   'KUL': [101.7099, 2.7456],
@@ -17,6 +26,20 @@ const IATA_COORDS: Record<string, [number, number]> = {
 };
 
 const FlightMap = ({ events }: { events: DutyEvent[] }) => {
+  const routes = useMemo(() => {
+    const r: any[] = [];
+    events.forEach((event) => {
+      if (event.type === 'FLIGHT' && event.depPort && event.arrPort) {
+        const from = IATA_COORDS[event.depPort.toUpperCase()];
+        const to = IATA_COORDS[event.arrPort.toUpperCase()];
+        if (from && to) {
+          r.push({ from, to });
+        }
+      }
+    });
+    return r;
+  }, [events]);
+
   const uniquePorts = useMemo(() => {
     const ports = new Set<string>();
     events.forEach(e => {
@@ -27,36 +50,67 @@ const FlightMap = ({ events }: { events: DutyEvent[] }) => {
   }, [events]);
 
   return (
-    <div className="w-full h-[500px] rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-card bg-gray-50 mb-16 relative flex items-center justify-center">
-      {/* Fallback visual for Mapbox resolution issues in local environment */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(#FF5A5F 1px, transparent 0)', backgroundSize: '40px 40px' }} />
-      </div>
-      
-      <div className="relative z-10 text-center px-10">
-          <div className="w-20 h-20 bg-rausch/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Plane className="text-rausch w-10 h-10 -rotate-45" />
-          </div>
-          <h4 className="text-2xl font-bold text-gray-900 mb-2">Interactive Flight Map</h4>
-          <p className="text-gray-500 max-w-md mx-auto">
-              Visualizing your routes across {uniquePorts.length} unique destinations this month. 
-              Mapbox interactive view is ready for production.
-          </p>
-          
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-              {uniquePorts.map(port => (
-                  <span key={port} className="bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm text-xs font-bold text-gray-700 uppercase flex items-center gap-2">
-                      <div className="w-2 h-2 bg-rausch rounded-full" />
-                      {port}
-                  </span>
-              ))}
-          </div>
-      </div>
+    <div className="w-full h-[500px] rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-card bg-slate-50 mb-16 relative">
+      <ComposableMap
+        projectionConfig={{
+          rotate: [-120, 0, 0],
+          scale: 140
+        }}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <Geographies geography={geoUrl}>
+          {({ geographies }) =>
+            geographies.map((geo) => (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                fill="#E2E8F0"
+                stroke="#FFFFFF"
+                strokeWidth={0.5}
+                style={{
+                  default: { outline: "none" },
+                  hover: { outline: "none", fill: "#CBD5E1" },
+                  pressed: { outline: "none" },
+                }}
+              />
+            ))
+          }
+        </Geographies>
+        
+        {routes.map((route, i) => (
+          <Line
+            key={i}
+            from={route.from}
+            to={route.to}
+            stroke="#FF5A5F"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeDasharray="4 4"
+          />
+        ))}
+
+        {uniquePorts.map(port => {
+            const coords = IATA_COORDS[port];
+            return (
+                <Marker key={port} coordinates={coords as [number, number]}>
+                    <circle r={4} fill="#FF5A5F" stroke="#FFF" strokeWidth={2} className="shadow-lg" />
+                    <text
+                        textAnchor="middle"
+                        y={-12}
+                        style={{ fontFamily: "Inter", fontSize: "10px", fontWeight: "black", fill: "#111827" }}
+                        className="uppercase"
+                    >
+                        {port}
+                    </text>
+                </Marker>
+            );
+        })}
+      </ComposableMap>
       
       <div className="absolute top-6 left-6 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border border-white shadow-sm z-10">
-        <p className="text-xs font-bold text-gray-900 flex items-center gap-2">
+        <p className="text-[10px] font-black text-gray-900 flex items-center gap-2 tracking-widest uppercase">
             <MapPin size={12} className="text-rausch" />
-            MISSION TRACKER
+            Mission Tracker
         </p>
       </div>
     </div>
