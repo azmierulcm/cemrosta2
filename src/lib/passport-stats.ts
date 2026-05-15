@@ -1,5 +1,6 @@
 import { Flight, CrewStats } from '@/types/passport';
 import { supabase } from '@/utils/supabase';
+import { evaluateAchievements } from './achievements/evaluator';
 
 /**
  * Recomputes CrewStats for a specific user
@@ -60,7 +61,6 @@ export async function recomputeStats(crewId: string) {
 
   // 4. Unique Counts
   const destinations = new Set(flights.flatMap(f => [f.origin_iata, f.destination_iata]));
-  const countries = new Set(); // Would need airport-to-country mapping
   const aircraftTypes = new Set(flights.map(f => f.aircraft_type).filter(Boolean));
 
   const finalStats: Partial<CrewStats> = {
@@ -71,9 +71,6 @@ export async function recomputeStats(crewId: string) {
     updated_at: new Date().toISOString(),
   };
 
-import { evaluateAchievements } from './achievements/evaluator';
-
-// ... inside recomputeStats
   // 5. Save to Supabase
   const { error: updateError } = await supabase
     .from('crew_stats')
