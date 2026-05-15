@@ -15,6 +15,7 @@ const Navbar = () => {
           </Link>
           <div className="hidden md:flex items-center gap-8 font-medium text-sm text-gray-600">
             <Link href="/" className="hover:text-black transition-colors">Home</Link>
+            <Link href="/marketplace" className="hover:text-black transition-colors">Marketplace</Link>
             <Link href="/profile" className="flex items-center gap-2 hover:text-black transition-colors group">
               <div className="p-1.5 rounded-full bg-gray-100 group-hover:bg-rausch/10 group-hover:text-rausch transition-colors">
                 <User size={16} />
