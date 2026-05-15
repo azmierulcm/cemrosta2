@@ -15,8 +15,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cemrosta | The Crew Passport",
+  metadataBase: new URL("https://cemrosta.vercel.app"),
+  title: {
+    default: "Cemrosta | The Crew Passport",
+    template: "%s — Cemrosta",
+  },
   description: "Convert your airline roster to calendar and build your digital destination passport.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon-192.png", sizes: "192x192" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_MY",
+    url: "https://cemrosta.vercel.app",
+    siteName: "Cemrosta",
+  },
+  twitter: {
+    card: "summary_large_image",
+    creator: "@cemrosta",
+  },
 };
 
 export default function RootLayout({
