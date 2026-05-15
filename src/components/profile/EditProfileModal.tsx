@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, Loader2, Camera, Trash2, CheckCircle2, User } from 'lucide-react';
+import { X, Upload, Loader2, Camera, Trash2, CheckCircle2, User, Plus } from 'lucide-react';
 import { supabase } from '@/utils/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 
