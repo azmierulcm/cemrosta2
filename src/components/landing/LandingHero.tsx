@@ -35,9 +35,9 @@ const LandingHero = () => {
           transition={{ delay: 0.2 }}
           className="text-xl md:text-2xl text-gray-500 mb-12 max-w-3xl mx-auto font-medium leading-relaxed"
         >
-          Drop your monthly roster PDF. We automatically extract your flights, 
-          sync them to your calendar in local time, and build a beautiful &apos;passport&apos; 
-          of the cities you&apos;ve flown to. <span className="text-gray-900 font-bold">Ready in 10 seconds.</span>
+          Build a beautiful digital passport of your flying career. 
+          Automatically extract flights, sync to your calendar, and unlock destination patches.
+          <span className="text-gray-900 font-bold block mt-2">Join the elite crew community today.</span>
         </motion.p>
 
         <motion.div
@@ -46,12 +46,11 @@ const LandingHero = () => {
           transition={{ delay: 0.3 }}
           className="flex flex-col md:flex-row items-center justify-center gap-6"
         >
-          <Link 
-            href="#upload"
+          <button 
             className="bg-rausch text-white px-10 py-5 rounded-2xl text-lg font-black shadow-2xl shadow-rausch/30 hover:scale-105 active:scale-95 transition-all w-full md:w-auto text-center"
           >
-            Upload Roster →
-          </Link>
+            Sign Up Now →
+          </button>
           <button 
             onClick={loadSampleRoster}
             className="bg-white text-gray-900 border-2 border-gray-100 px-10 py-5 rounded-2xl text-lg font-black hover:bg-gray-50 active:scale-95 transition-all w-full md:w-auto"
