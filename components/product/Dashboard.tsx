@@ -271,19 +271,51 @@ export const Dashboard = () => {
 
           {/* Roster Selector */}
           <div className="relative mt-4">
-            <button
-              onClick={() => setShowRosterPicker((v) => !v)}
-              className="flex items-center gap-3 text-text-muted font-bold text-lg tracking-tight hover:text-text transition-colors group"
-            >
-              <Calendar size={16} className="text-accent" />
-              {activeLabel}
-              <span className="mx-1 text-border">·</span>
-              <span>{activeRoster.events.length} Events</span>
-              {rosters.length > 1 && (
-                <ChevronDown size={16} className={`transition-transform ${showRosterPicker ? 'rotate-180' : ''}`} />
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Roster label — clickable to switch when multiple exist */}
+              <button
+                onClick={() => rosters.length > 1 && setShowRosterPicker((v) => !v)}
+                className={`flex items-center gap-3 font-bold text-lg tracking-tight transition-colors ${rosters.length > 1 ? 'text-text-muted hover:text-text cursor-pointer' : 'text-text-muted cursor-default'}`}
+              >
+                <Calendar size={16} className="text-accent" />
+                {activeLabel}
+                <span className="mx-1 text-border">·</span>
+                <span>{activeRoster.events.length} Events</span>
+                {rosters.length > 1 && (
+                  <ChevronDown size={16} className={`transition-transform ${showRosterPicker ? 'rotate-180' : ''}`} />
+                )}
+              </button>
 
+              {/* Trash — always visible for the active roster */}
+              {confirmDeleteId === activeRosterId ? (
+                <div className="flex items-center gap-2 ml-2 bg-red-50 border border-red-200 rounded-full px-4 py-1.5">
+                  <AlertTriangle size={12} className="text-red-500 shrink-0" />
+                  <span className="text-[11px] font-black text-red-600">Delete {activeLabel}?</span>
+                  <button
+                    onClick={() => { deleteRoster(activeRosterId!); setConfirmDeleteId(null); setShowRosterPicker(false); }}
+                    className="text-[10px] font-black uppercase tracking-wider text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded-full transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="text-[10px] font-black uppercase tracking-wider text-text-muted hover:text-text px-2 py-1 rounded-full border border-red-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDeleteId(activeRosterId)}
+                  aria-label={`Delete ${activeLabel} roster`}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-text-subtle hover:text-red-500 hover:bg-red-50 border border-border transition-all ml-1"
+                >
+                  <Trash2 size={14} strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
+
+            {/* Multi-roster dropdown (switch only — no delete here anymore) */}
             <AnimatePresence>
               {showRosterPicker && rosters.length > 1 && (
                 <motion.div
@@ -295,58 +327,21 @@ export const Dashboard = () => {
                   {rosters.map((r) => (
                     <div
                       key={r.id}
-                      className={`flex items-center border-b border-border/50 last:border-0 group ${r.id === activeRosterId ? 'bg-accent/5' : ''}`}
+                      className={`flex items-center border-b border-border/50 last:border-0 ${r.id === activeRosterId ? 'bg-accent/5' : ''}`}
                     >
-                      {confirmDeleteId === r.id ? (
-                        /* ── Confirm-delete row ── */
-                        <div className="flex items-center gap-3 w-full px-6 py-4">
-                          <AlertTriangle size={14} className="text-red-500 shrink-0" />
-                          <span className="text-xs font-bold text-text flex-1">Delete {r.month} {r.year}?</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteRoster(r.id);
-                              setConfirmDeleteId(null);
-                              setShowRosterPicker(false);
-                            }}
-                            className="text-[10px] font-black uppercase tracking-wider text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded-full transition-colors"
-                          >
-                            Delete
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
-                            className="text-[10px] font-black uppercase tracking-wider text-text-muted hover:text-text px-3 py-1 rounded-full border border-border transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        /* ── Normal row ── */
-                        <>
-                          <button
-                            onClick={() => { selectRoster(r.id); setShowRosterPicker(false); }}
-                            className="flex-1 text-left px-6 py-4 hover:bg-surface-2 transition-colors"
-                          >
-                            <p className={`font-bold text-sm ${r.id === activeRosterId ? 'text-accent' : 'text-text'}`}>
-                              {r.month} {r.year}
-                            </p>
-                            <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono mt-0.5">
-                              {r.totalSectors} Flights · {r.uniqueDestinations} Destinations
-                            </p>
-                          </button>
-                          <div className="flex items-center gap-2 pr-4">
-                            {r.id === activeRosterId && (
-                              <div className="w-2 h-2 rounded-full bg-accent" />
-                            )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(r.id); }}
-                              aria-label={`Delete ${r.month} ${r.year} roster`}
-                              className="w-8 h-8 flex items-center justify-center rounded-full text-text-subtle hover:text-red-500 hover:bg-red-50 transition-all"
-                            >
-                              <Trash2 size={14} strokeWidth={2.5} />
-                            </button>
-                          </div>
-                        </>
+                      <button
+                        onClick={() => { selectRoster(r.id); setShowRosterPicker(false); setConfirmDeleteId(null); }}
+                        className="flex-1 text-left px-6 py-4 hover:bg-surface-2 transition-colors"
+                      >
+                        <p className={`font-bold text-sm ${r.id === activeRosterId ? 'text-accent' : 'text-text'}`}>
+                          {r.month} {r.year}
+                        </p>
+                        <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono mt-0.5">
+                          {r.totalSectors} Flights · {r.uniqueDestinations} Destinations
+                        </p>
+                      </button>
+                      {r.id === activeRosterId && (
+                        <div className="w-2 h-2 rounded-full bg-accent mr-5" />
                       )}
                     </div>
                   ))}
