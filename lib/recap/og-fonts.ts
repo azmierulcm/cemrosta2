@@ -1,4 +1,25 @@
+import fs from 'fs';
+import path from 'path';
+
 type FontResult = { name: string; data: ArrayBuffer; weight: 400 | 700 | 800 | 900; style: 'normal' };
+
+/**
+ * Geist Regular ships inside next/dist — guaranteed to exist on any
+ * deployment that has Next.js installed. Used as a hard fallback so
+ * Satori always has at least one font (it throws if fonts: [] is passed).
+ */
+function loadGeistFallback(): FontResult | null {
+  try {
+    const geistPath = path.join(
+      path.dirname(require.resolve('next/package.json')),
+      'dist/compiled/@vercel/og/Geist-Regular.ttf',
+    );
+    const data = fs.readFileSync(geistPath).buffer as ArrayBuffer;
+    return { name: 'Inter', data, weight: 400, style: 'normal' };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Fetch a single Google Font as an ArrayBuffer for Satori / ImageResponse.
@@ -10,9 +31,11 @@ async function loadGoogleFont(family: string, weight: number): Promise<ArrayBuff
       `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@${weight}&display=swap`,
       {
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-            '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          // Old iOS UA — Google Fonts returns TTF instead of WOFF2.
+        // Satori only accepts TTF/OTF; WOFF2 throws "Unsupported OpenType signature wOF2".
+        'User-Agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 ' +
+            '(KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
         },
         signal: AbortSignal.timeout(8_000),
       },
@@ -33,7 +56,8 @@ async function loadGoogleFont(family: string, weight: number): Promise<ArrayBuff
 /**
  * Returns the font options array for ImageResponse.
  * Loads Inter + IBM Plex Mono from Google Fonts.
- * Falls back to an empty array (Satori uses system fonts) if loading fails.
+ * Always returns at least one font — falls back to the Geist Regular
+ * that ships with Next.js so Satori never throws "No fonts loaded".
  */
 export async function getRecapFonts(): Promise<FontResult[]> {
   const [interReg, interBold, interBlack, monoMed] = await Promise.all([
@@ -48,5 +72,12 @@ export async function getRecapFonts(): Promise<FontResult[]> {
   if (interBold)  fonts.push({ name: 'Inter', data: interBold,  weight: 700, style: 'normal' });
   if (interBlack) fonts.push({ name: 'Inter', data: interBlack, weight: 900, style: 'normal' });
   if (monoMed)    fonts.push({ name: 'IBM Plex Mono', data: monoMed, weight: 400, style: 'normal' });
+
+  // Satori requires at least one font — guarantee that with the bundled Geist fallback.
+  if (fonts.length === 0) {
+    const fallback = loadGeistFallback();
+    if (fallback) fonts.push(fallback);
+  }
+
   return fonts;
 }
