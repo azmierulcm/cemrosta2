@@ -341,7 +341,7 @@ export const Dashboard = () => {
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(r.id); }}
                               aria-label={`Delete ${r.month} ${r.year} roster`}
-                              className="w-8 h-8 flex items-center justify-center rounded-full text-text-subtle hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              className="w-8 h-8 flex items-center justify-center rounded-full text-text-subtle hover:text-red-500 hover:bg-red-50 transition-all"
                             >
                               <Trash2 size={14} strokeWidth={2.5} />
                             </button>
@@ -359,7 +359,7 @@ export const Dashboard = () => {
         <div className="flex items-center gap-4 shrink-0">
           <button
             onClick={() => setShowUpload((v) => !v)}
-            className="px-8 py-4 rounded-full font-bold text-text-muted hover:bg-surface-2 hover:text-text transition-all active:scale-95 border border-transparent hover:border-border flex items-center gap-2"
+            className="px-8 py-4 rounded-full font-bold text-text hover:bg-surface-2 transition-all active:scale-95 border border-border flex items-center gap-2"
           >
             <Upload size={18} strokeWidth={2.5} />
             {showUpload ? 'Cancel' : 'Upload Another'}
