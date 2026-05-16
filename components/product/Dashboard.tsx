@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle } from 'lucide-react';
+import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Pencil, Check, X } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { DutyEvent } from '@/lib/types';
 import { generateICS, downloadICS } from '@/lib/utils/calendar';
@@ -10,9 +10,53 @@ import { DutyCalendar } from './DutyCalendar';
 import { DestinationPatch } from './DestinationPatch';
 import { FileUploader } from './FileUploader';
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-[14px] font-mono font-bold text-text focus:outline-none focus:border-accent transition-colors w-full";
+
 export const EventCard = ({ event, index }: { event: DutyEvent; index: number }) => {
+  const { updateEvent } = useRoster();
   const isFlight = event.type === 'FLIGHT';
   const isStandby = event.type === 'STANDBY';
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<DutyEvent>(event);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const set = (key: keyof DutyEvent, val: string) =>
+    setDraft((prev) => ({ ...prev, [key]: val }));
+
+  const handleEdit = () => {
+    setDraft(event);
+    setSaveError(null);
+    setEditing(true);
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    setSaveError(null);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateEvent(event.id, draft);
+      setEditing(false);
+    } catch {
+      setSaveError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <motion.div
@@ -21,85 +65,175 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
       transition={{ delay: index * 0.05 }}
       className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-border mb-8 group hover:shadow-2xl hover:shadow-black/5 transition-all relative overflow-hidden"
     >
-      {isFlight && (
+      {isFlight && !editing && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-accent/3 blur-[40px] -mr-16 -mt-16 rounded-full" />
       )}
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-10 relative z-10">
-        <div className="flex items-start gap-8">
-          <div className={`
-            w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-sm
-            ${isFlight ? 'bg-accent/5 text-accent border border-accent/10' : 'bg-orange-50 text-orange-600 border border-orange-100'}
-          `}>
-            {isFlight ? <Plane className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
-          </div>
-
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono bg-surface-2 px-3 py-1 rounded-full border border-border">
-                {event.date}
-              </span>
-              {isStandby && (
-                <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm">
-                  Standby Duty
-                </span>
-              )}
-            </div>
-            <h3 className="text-3xl font-bold text-text tracking-tighter">
-              {isFlight ? `Flight ${event.flightNumber}` : `Duty Code: ${event.id}`}
-            </h3>
-            {isFlight && (
-              <div className="flex items-center gap-3 mt-3 text-text-muted font-bold text-xl tracking-tight">
-                <span className="text-text">{event.depPort}</span>
-                <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent/30" />
-                  <div className="w-8 h-[2px] bg-accent/20" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                </div>
-                <span className="text-text">{event.arrPort}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-6 md:text-right">
-          <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
-            <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign On</p>
-            <p className="text-2xl font-black text-text font-mono">{event.signOn || event.std || '--:--'}</p>
-          </div>
-          <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
-            <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign Off</p>
-            <p className="text-2xl font-black text-text font-mono">{event.signOff || event.sta || '--:--'}</p>
-          </div>
-        </div>
-      </div>
-
-      {isFlight && event.std && (
-        <div className="mt-8 flex flex-wrap items-center gap-10 text-[10px] text-text-subtle font-black uppercase tracking-[0.15em] font-mono">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-surface-2 flex items-center justify-center border border-border">
-              <Clock className="w-4 h-4 text-accent" />
-            </div>
-            <span>STD {event.std}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-surface-2 flex items-center justify-center border border-border">
-              <Clock className="w-4 h-4 text-accent" />
-            </div>
-            <span>STA {event.sta || '--:--'}</span>
-          </div>
-        </div>
+      {/* ── Edit button (top-right) ── */}
+      {!editing && (
+        <button
+          onClick={handleEdit}
+          aria-label="Edit event"
+          className="absolute top-6 right-6 w-9 h-9 flex items-center justify-center rounded-full text-text-subtle hover:text-accent hover:bg-accent/5 border border-border opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all z-10"
+        >
+          <Pencil size={14} strokeWidth={2.5} />
+        </button>
       )}
 
-      {event.hotel && (
-        <div className="mt-10 pt-10 border-t border-border flex flex-col sm:flex-row sm:items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/20">
-              <Hotel className="w-6 h-6" strokeWidth={2.5} />
+      {editing ? (
+        /* ── EDIT MODE ── */
+        <div className="relative z-10 space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isFlight ? 'bg-accent/5 text-accent border border-accent/10' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
+              {isFlight ? <Plane className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
             </div>
-            <span className="font-black text-text uppercase text-xs tracking-widest font-mono">Layover Operations:</span>
+            <span className="text-[11px] font-black text-text-subtle uppercase tracking-widest font-mono">Editing duty</span>
           </div>
-          <span className="bg-accent/5 border border-accent/10 px-5 py-2.5 rounded-full text-accent font-black text-sm tracking-tight shadow-sm">{event.hotel}</span>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Date">
+              <input className={inputCls} value={draft.date} onChange={(e) => set('date', e.target.value)} placeholder="YYYY-MM-DD" />
+            </Field>
+
+            {isFlight && (
+              <>
+                <Field label="Flight No.">
+                  <input className={inputCls} value={draft.flightNumber ?? ''} onChange={(e) => set('flightNumber', e.target.value)} placeholder="MH 4" />
+                </Field>
+                <Field label="Dep Port">
+                  <input className={inputCls} value={draft.depPort ?? ''} onChange={(e) => set('depPort', e.target.value.toUpperCase())} placeholder="KUL" maxLength={4} />
+                </Field>
+                <Field label="Arr Port">
+                  <input className={inputCls} value={draft.arrPort ?? ''} onChange={(e) => set('arrPort', e.target.value.toUpperCase())} placeholder="LHR" maxLength={4} />
+                </Field>
+                <Field label="STD">
+                  <input className={inputCls} value={draft.std ?? ''} onChange={(e) => set('std', e.target.value)} placeholder="09:00" />
+                </Field>
+                <Field label="STA">
+                  <input className={inputCls} value={draft.sta ?? ''} onChange={(e) => set('sta', e.target.value)} placeholder="16:00" />
+                </Field>
+              </>
+            )}
+
+            <Field label="Sign On">
+              <input className={inputCls} value={draft.signOn ?? ''} onChange={(e) => set('signOn', e.target.value)} placeholder="08:30" />
+            </Field>
+            <Field label="Sign Off">
+              <input className={inputCls} value={draft.signOff ?? ''} onChange={(e) => set('signOff', e.target.value)} placeholder="17:30" />
+            </Field>
+
+            {isFlight && (
+              <Field label="Hotel / Layover">
+                <input className={`${inputCls} col-span-2`} value={draft.hotel ?? ''} onChange={(e) => set('hotel', e.target.value)} placeholder="Hilton London Heathrow" />
+              </Field>
+            )}
+
+            {!isFlight && (
+              <Field label="Description">
+                <input className={inputCls} value={draft.description ?? ''} onChange={(e) => set('description', e.target.value)} placeholder="Standby duty description" />
+              </Field>
+            )}
+          </div>
+
+          {saveError && (
+            <p className="text-[12px] text-red-500 font-bold">{saveError}</p>
+          )}
+
+          <div className="flex items-center gap-3 pt-2 border-t border-border">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 bg-accent text-accent-fg px-6 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-60"
+            >
+              <Check size={14} strokeWidth={3} />
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={saving}
+              className="flex items-center gap-2 text-text-muted hover:text-text border border-border px-6 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest transition-all"
+            >
+              <X size={14} strokeWidth={2.5} />
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* ── READ MODE ── */
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-10">
+            <div className="flex items-start gap-8">
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isFlight ? 'bg-accent/5 text-accent border border-accent/10' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
+                {isFlight ? <Plane className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] font-mono bg-surface-2 px-3 py-1 rounded-full border border-border">
+                    {event.date}
+                  </span>
+                  {isStandby && (
+                    <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm">
+                      Standby Duty
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-3xl font-bold text-text tracking-tighter">
+                  {isFlight ? `Flight ${event.flightNumber}` : `Duty Code: ${event.id}`}
+                </h3>
+                {isFlight && (
+                  <div className="flex items-center gap-3 mt-3 text-text-muted font-bold text-xl tracking-tight">
+                    <span className="text-text">{event.depPort}</span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent/30" />
+                      <div className="w-8 h-[2px] bg-accent/20" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    </div>
+                    <span className="text-text">{event.arrPort}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-6 md:text-right">
+              <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign On</p>
+                <p className="text-2xl font-black text-text font-mono">{event.signOn || event.std || '--:--'}</p>
+              </div>
+              <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign Off</p>
+                <p className="text-2xl font-black text-text font-mono">{event.signOff || event.sta || '--:--'}</p>
+              </div>
+            </div>
+          </div>
+
+          {isFlight && event.std && (
+            <div className="mt-8 flex flex-wrap items-center gap-10 text-[10px] text-text-subtle font-black uppercase tracking-[0.15em] font-mono">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-surface-2 flex items-center justify-center border border-border">
+                  <Clock className="w-4 h-4 text-accent" />
+                </div>
+                <span>STD {event.std}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-surface-2 flex items-center justify-center border border-border">
+                  <Clock className="w-4 h-4 text-accent" />
+                </div>
+                <span>STA {event.sta || '--:--'}</span>
+              </div>
+            </div>
+          )}
+
+          {event.hotel && (
+            <div className="mt-10 pt-10 border-t border-border flex flex-col sm:flex-row sm:items-center gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/20">
+                  <Hotel className="w-6 h-6" strokeWidth={2.5} />
+                </div>
+                <span className="font-black text-text uppercase text-xs tracking-widest font-mono">Layover Operations:</span>
+              </div>
+              <span className="bg-accent/5 border border-accent/10 px-5 py-2.5 rounded-full text-accent font-black text-sm tracking-tight shadow-sm">{event.hotel}</span>
+            </div>
+          )}
         </div>
       )}
     </motion.div>

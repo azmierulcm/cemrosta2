@@ -6,7 +6,8 @@ import type { RosterSummary } from '@/lib/types/roster';
 import { extractDestinations } from '@/lib/utils/destinations';
 import { calculateKilometers, formatBlockHours } from '@/lib/utils/geo/haversine';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { getUserRosters, getRoster, deleteRoster as deleteRosterAction } from '@/lib/actions/rosters';
+import { getUserRosters, getRoster, deleteRoster as deleteRosterAction, updateRosterEvents } from '@/lib/actions/rosters';
+import type { DutyEvent } from '@/lib/types';
 
 interface RosterContextType {
   rosters: RosterSummary[];
@@ -18,6 +19,7 @@ interface RosterContextType {
   setRoster: (roster: RosterData, rosterId: string) => void;
   selectRoster: (rosterId: string) => Promise<void>;
   deleteRoster: (rosterId: string) => Promise<void>;
+  updateEvent: (eventId: string, patch: Partial<DutyEvent>) => Promise<void>;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -149,6 +151,20 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
     });
   }, [selectRoster]);
 
+  const updateEvent = useCallback(async (eventId: string, patch: Partial<DutyEvent>) => {
+    if (!activeRosterId || !activeRoster) return;
+
+    const updatedEvents = activeRoster.events.map((e) =>
+      e.id === eventId ? { ...e, ...patch } : e,
+    );
+
+    // Optimistic local update
+    setActiveRoster((prev) => prev ? enrichRoster({ ...prev, events: updatedEvents }) : prev);
+
+    // Persist to Firestore (non-blocking — errors surface via thrown rejection)
+    await updateRosterEvents(activeRosterId, updatedEvents);
+  }, [activeRosterId, activeRoster]);
+
   const setLoading = useCallback((loading: boolean) => setIsLoadingState(loading), []);
   const setError = useCallback((err: string | null) => {
     setErrorState(err);
@@ -194,6 +210,7 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
         setRoster,
         selectRoster,
         deleteRoster,
+        updateEvent,
         setLoading,
         setError,
         reset,

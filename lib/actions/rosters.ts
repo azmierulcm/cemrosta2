@@ -69,6 +69,26 @@ export async function deleteRoster(rosterId: string): Promise<void> {
   await adminDb.collection('rosters').doc(rosterId).delete();
 }
 
+export async function updateRosterEvents(
+  rosterId: string,
+  events: DutyEvent[],
+): Promise<void> {
+  const flights = events.filter((e) => e.type === 'FLIGHT');
+  const totalSectors = flights.length;
+  const totalKm = flights.reduce((acc, e) => {
+    if (e.depPort && e.arrPort) return acc + calculateKilometers(e.depPort, e.arrPort);
+    return acc;
+  }, 0);
+  const uniqueDestinations = extractDestinations(events).length;
+
+  await adminDb.collection('rosters').doc(rosterId).update({
+    events,
+    totalSectors,
+    totalKm,
+    uniqueDestinations,
+  });
+}
+
 export async function getRoster(rosterId: string): Promise<RosterData & { id: string }> {
   const doc = await adminDb.collection('rosters').doc(rosterId).get();
   if (!doc.exists) throw new Error('Roster not found');
