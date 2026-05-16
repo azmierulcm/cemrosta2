@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Menu, X, Upload, LayoutDashboard, MapPinned, ShoppingBag } from 'lucide-react'
+import { Menu, X, LayoutDashboard, MapPinned, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -72,13 +72,12 @@ export const Navbar = () => {
                 >
                   Sign in
                 </button>
-                <Link
-                  href="#upload"
+                <button
+                  onClick={() => openAuthModal('signup')}
                   className="flex items-center gap-2 px-5 py-2 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-medium hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
                 >
-                  <Upload size={15} />
-                  Upload roster
-                </Link>
+                  Register
+                </button>
               </>
             )}
           </div>
@@ -133,14 +132,12 @@ export const Navbar = () => {
               </>
             ) : (
               <>
-                <Link
-                  href="#upload"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                <button
+                  onClick={() => { openAuthModal('signup'); setIsMobileMenuOpen(false); }}
                   className="flex items-center gap-3 w-full px-4 py-3 bg-accent text-accent-fg rounded-[var(--radius-lg)] text-[15px] font-medium"
                 >
-                  <Upload size={18} />
-                  Upload roster
-                </Link>
+                  Register
+                </button>
                 <button
                   onClick={() => { openAuthModal('login'); setIsMobileMenuOpen(false) }}
                   className="w-full text-left px-4 py-3 rounded-[var(--radius-lg)] text-[15px] text-text hover:bg-surface transition-colors"
