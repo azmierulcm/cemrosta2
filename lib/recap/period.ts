@@ -103,19 +103,18 @@ export function recentPeriodKeys(period: RecapPeriod, count = 6): string[] {
   let month = now.getUTCMonth() + 1;
 
   if (period === 'month') {
+    // Start from the current month (inclusive) so the active roster month is always available.
     for (let i = 0; i < count; i++) {
+      keys.push(`${year}-${String(month).padStart(2, '0')}`);
       month--;
       if (month === 0) { month = 12; year--; }
-      keys.push(`${year}-${String(month).padStart(2, '0')}`);
     }
     return keys;
   }
 
   if (period === '6m') {
+    // Start from the current half-year (inclusive).
     let half = month <= 6 ? 1 : 2;
-    // Step back one half to get the last completed
-    half--;
-    if (half === 0) { half = 2; year--; }
     for (let i = 0; i < count; i++) {
       keys.push(`${year}-H${half}`);
       half--;
@@ -124,8 +123,7 @@ export function recentPeriodKeys(period: RecapPeriod, count = 6): string[] {
     return keys;
   }
 
-  // '1y'
-  year--; // last completed year
+  // '1y' — include the current year so in-progress yearly stats are visible.
   for (let i = 0; i < count; i++) {
     keys.push(String(year - i));
   }
