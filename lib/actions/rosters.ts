@@ -65,6 +65,10 @@ export async function getUserRosters(userId: string): Promise<RosterSummary[]> {
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)); // newest first
 }
 
+export async function deleteRoster(rosterId: string): Promise<void> {
+  await adminDb.collection('rosters').doc(rosterId).delete();
+}
+
 export async function getRoster(rosterId: string): Promise<RosterData & { id: string }> {
   const doc = await adminDb.collection('rosters').doc(rosterId).get();
   if (!doc.exists) throw new Error('Roster not found');

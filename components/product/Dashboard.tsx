@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar } from 'lucide-react';
+import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { DutyEvent } from '@/lib/types';
 import { generateICS, downloadICS } from '@/lib/utils/calendar';
@@ -107,9 +107,11 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
 };
 
 export const Dashboard = () => {
-  const { activeRoster, rosters, activeRosterId, selectRoster, isLoading } = useRoster();
+  const { activeRoster, rosters, activeRosterId, selectRoster, deleteRoster, isLoading } = useRoster();
   const [showUpload, setShowUpload] = useState(false);
   const [showRosterPicker, setShowRosterPicker] = useState(false);
+  // ID of the roster currently pending delete confirmation (null = none)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   if (!activeRoster) return null;
 
@@ -157,23 +159,62 @@ export const Dashboard = () => {
                   className="absolute top-full left-0 mt-3 bg-white border border-border rounded-[1.5rem] shadow-2xl shadow-black/10 z-50 overflow-hidden min-w-[280px]"
                 >
                   {rosters.map((r) => (
-                    <button
+                    <div
                       key={r.id}
-                      onClick={() => { selectRoster(r.id); setShowRosterPicker(false); }}
-                      className={`w-full text-left px-6 py-4 flex items-center justify-between hover:bg-surface-2 transition-colors border-b border-border/50 last:border-0 ${r.id === activeRosterId ? 'bg-accent/5' : ''}`}
+                      className={`flex items-center border-b border-border/50 last:border-0 group ${r.id === activeRosterId ? 'bg-accent/5' : ''}`}
                     >
-                      <div>
-                        <p className={`font-bold text-sm ${r.id === activeRosterId ? 'text-accent' : 'text-text'}`}>
-                          {r.month} {r.year}
-                        </p>
-                        <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono mt-0.5">
-                          {r.totalSectors} Flights · {r.uniqueDestinations} Destinations
-                        </p>
-                      </div>
-                      {r.id === activeRosterId && (
-                        <div className="w-2 h-2 rounded-full bg-accent" />
+                      {confirmDeleteId === r.id ? (
+                        /* ── Confirm-delete row ── */
+                        <div className="flex items-center gap-3 w-full px-6 py-4">
+                          <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                          <span className="text-xs font-bold text-text flex-1">Delete {r.month} {r.year}?</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteRoster(r.id);
+                              setConfirmDeleteId(null);
+                              setShowRosterPicker(false);
+                            }}
+                            className="text-[10px] font-black uppercase tracking-wider text-white bg-red-500 hover:bg-red-600 px-3 py-1 rounded-full transition-colors"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                            className="text-[10px] font-black uppercase tracking-wider text-text-muted hover:text-text px-3 py-1 rounded-full border border-border transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        /* ── Normal row ── */
+                        <>
+                          <button
+                            onClick={() => { selectRoster(r.id); setShowRosterPicker(false); }}
+                            className="flex-1 text-left px-6 py-4 hover:bg-surface-2 transition-colors"
+                          >
+                            <p className={`font-bold text-sm ${r.id === activeRosterId ? 'text-accent' : 'text-text'}`}>
+                              {r.month} {r.year}
+                            </p>
+                            <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono mt-0.5">
+                              {r.totalSectors} Flights · {r.uniqueDestinations} Destinations
+                            </p>
+                          </button>
+                          <div className="flex items-center gap-2 pr-4">
+                            {r.id === activeRosterId && (
+                              <div className="w-2 h-2 rounded-full bg-accent" />
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(r.id); }}
+                              aria-label={`Delete ${r.month} ${r.year} roster`}
+                              className="w-8 h-8 flex items-center justify-center rounded-full text-text-subtle hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            >
+                              <Trash2 size={14} strokeWidth={2.5} />
+                            </button>
+                          </div>
+                        </>
                       )}
-                    </button>
+                    </div>
                   ))}
                 </motion.div>
               )}

@@ -6,7 +6,7 @@ import type { RosterSummary } from '@/lib/types/roster';
 import { extractDestinations } from '@/lib/utils/destinations';
 import { calculateKilometers, formatBlockHours } from '@/lib/utils/geo/haversine';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { getUserRosters, getRoster } from '@/lib/actions/rosters';
+import { getUserRosters, getRoster, deleteRoster as deleteRosterAction } from '@/lib/actions/rosters';
 
 interface RosterContextType {
   rosters: RosterSummary[];
@@ -17,6 +17,7 @@ interface RosterContextType {
   error: string | null;
   setRoster: (roster: RosterData, rosterId: string) => void;
   selectRoster: (rosterId: string) => Promise<void>;
+  deleteRoster: (rosterId: string) => Promise<void>;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -124,6 +125,30 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
     setRosters((prev) => [summary, ...prev.filter((r) => r.id !== rosterId)]);
   }, []);
 
+  const deleteRoster = useCallback(async (rosterId: string) => {
+    // Fire the Firestore delete in the background
+    deleteRosterAction(rosterId).catch(console.error);
+
+    // Optimistically remove from the list and handle active-roster switching
+    setRosters((prev) => {
+      const next = prev.filter((r) => r.id !== rosterId);
+
+      // If the deleted one was active, auto-select the next best
+      setActiveRosterId((currentId) => {
+        if (currentId !== rosterId) return currentId;
+        if (next.length > 0) {
+          selectRoster(next[0].id).catch(console.error);
+          return next[0].id;
+        }
+        // No rosters left — clear the dashboard
+        setActiveRoster(null);
+        return null;
+      });
+
+      return next;
+    });
+  }, [selectRoster]);
+
   const setLoading = useCallback((loading: boolean) => setIsLoadingState(loading), []);
   const setError = useCallback((err: string | null) => {
     setErrorState(err);
@@ -168,6 +193,7 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
         error,
         setRoster,
         selectRoster,
+        deleteRoster,
         setLoading,
         setError,
         reset,
