@@ -39,7 +39,7 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   KTI: 'kertajati_patch.png',
   // East Asia
   HKG: 'hong_kong_patch.png',
-  CAN: 'guangzhou_patch.png',
+  // CAN: 'guangzhou_patch.png', // artwork pending
   PVG: 'shanghai_patch.png',
   PEK: 'beijing_capital_patch.png',
   PKX: 'beijing_daxing_patch.png',
