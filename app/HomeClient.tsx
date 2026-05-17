@@ -101,7 +101,7 @@ export default function HomeClient() {
               key="dashboard"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="pt-32"
+              className="pt-4"
             >
               <Dashboard />
             </motion.div>
