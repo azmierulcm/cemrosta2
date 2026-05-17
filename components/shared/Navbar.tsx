@@ -31,12 +31,17 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
 
-          {/* Wordmark */}
+          {/* Logo + Wordmark */}
           <Link
             href="/"
-            className="text-[22px] font-semibold text-text tracking-tight hover:opacity-75 transition-opacity"
+            className="flex items-center gap-2 hover:opacity-75 transition-opacity"
           >
-            Cemrosta
+            <div className="flex flex-col gap-[3px]">
+              <div className="w-5 h-1 bg-accent/20 rounded-sm" />
+              <div className="w-5 h-2 bg-accent/50 rounded-sm" />
+              <div className="w-5 h-4 bg-accent rounded-sm" />
+            </div>
+            <span className="text-[22px] font-semibold text-text tracking-tight">Cemrosta</span>
           </Link>
 
           {/* Desktop right */}
