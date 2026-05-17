@@ -53,8 +53,8 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
     if (lower.includes('no flights') || lower.includes('no events') || lower.includes('could not parse') || lower.includes('empty')) {
       return 'No flights found in this PDF. Make sure it\'s a Malaysia Airlines AIMS roster, not a scanned image.';
     }
-    if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch')) {
-      return 'Network error — check your connection and try again.';
+    if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch') || lower.includes('abort') || lower.includes('timed out') || lower.includes('timeout')) {
+      return 'The request timed out. Your PDF may be too large — try a single-month roster and upload again.';
     }
     if (lower.includes('too large') || lower.includes('size')) {
       return 'This PDF is too large. Try a single-month roster file instead.';
@@ -88,6 +88,9 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
 
     try {
       const result = await parseRosterPreview(formData);
+      if (!result) {
+        throw new Error('Request timed out — no response from server.');
+      }
       setPreviewData(result);
     } catch (err: unknown) {
       setError(classifyError(err));

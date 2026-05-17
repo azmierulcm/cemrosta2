@@ -1,7 +1,12 @@
 import { ImageResponse } from 'next/og';
 import type { ReactElement } from 'react';
 
-type FontOptions = ConstructorParameters<typeof ImageResponse>[1]['fonts'];
+interface RecapFont {
+  name: string;
+  data: ArrayBuffer;
+  weight: 400 | 700 | 800 | 900;
+  style: 'normal';
+}
 
 /**
  * Renders a Satori JSX tree to a PNG Response, forcing eager evaluation so
@@ -15,7 +20,7 @@ type FontOptions = ConstructorParameters<typeof ImageResponse>[1]['fonts'];
  */
 export async function renderImage(
   element: ReactElement,
-  options: { width: number; height: number; fonts: FontOptions; filename?: string },
+  options: { width: number; height: number; fonts: RecapFont[]; filename?: string },
 ): Promise<Response> {
   const ir = new ImageResponse(element, {
     width: options.width,

@@ -46,8 +46,8 @@ export function parseMasAims(text: string): ParsedRoster {
 
       const flight: ParsedFlight = {
         flightNumber: `MH${flightNo}`,
-        depPort: ports[0] || '???',
-        arrPort: ports[1] || '???',
+        depPort: ports[0] || '',
+        arrPort: ports[1] || '',
         std: times[0] || '00:00',
         sta: times[1] || '00:00',
       };
