@@ -102,14 +102,18 @@ export function generateICS(roster: RosterData): string | null {
     };
   });
 
+  console.log('[generateICS] events to create:', JSON.stringify(icsEvents, null, 2));
+
   const { error, value } = ics.createEvents(icsEvents);
 
   if (error) {
-    console.error('[generateICS] ICS validation error:', error);
+    console.error('[generateICS] ICS validation error message:', (error as Error).message ?? JSON.stringify(error));
+    console.error('[generateICS] ICS error full:', error);
     // Still try to use the value if it was produced despite validation warnings
     if (!value) return null;
   }
 
+  console.log('[generateICS] success, value length:', value?.length);
   return value || null;
 }
 
