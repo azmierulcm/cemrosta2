@@ -32,7 +32,6 @@ export async function getLifetimeDestinations(
     for (const e of events) {
       if (e.type === 'FLIGHT' && e.arrPort) {
         const iata = (e.arrPort as string).toUpperCase();
-        if (!/^[A-Z]{3}$/.test(iata)) continue;
         visitMap.set(iata, (visitMap.get(iata) ?? 0) + 1);
         if (isLatest) latestIatas.add(iata);
       }

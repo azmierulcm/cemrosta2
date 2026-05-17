@@ -3,7 +3,6 @@
 import React from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { LogIn, ShoppingBag } from 'lucide-react';
-import { Navbar } from '@/components/shared/Navbar';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading, openAuthModal } = useAuth();
@@ -47,10 +46,5 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function MarketplaceLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Navbar />
-      <AuthGate>{children}</AuthGate>
-    </>
-  );
+  return <AuthGate>{children}</AuthGate>;
 }

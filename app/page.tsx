@@ -1,8 +1,6 @@
 import { Metadata } from "next";
 import HomeClient from "./HomeClient";
 
-export const maxDuration = 60;
-
 export const metadata: Metadata = {
   title: "Cemrosta — Your roster, transformed. Built for Malaysian crew.",
   description: "Drop your Malaysia Airlines roster PDF. We sync your calendar, track your destinations, and build your lifetime flight passport. Ready in 10 seconds.",

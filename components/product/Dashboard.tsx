@@ -178,17 +178,17 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
                   )}
                 </div>
                 <h3 className="text-3xl font-bold text-text tracking-tighter">
-                  {isFlight ? `Flight ${event.flightNumber}` : (event.description || `Standby ${event.id}`)}
+                  {isFlight ? `Flight ${event.flightNumber}` : `Duty Code: ${event.id}`}
                 </h3>
                 {isFlight && (
                   <div className="flex items-center gap-3 mt-3 text-text-muted font-bold text-xl tracking-tight">
-                    <span className="text-text">{event.depPort || '???'}</span>
+                    <span className="text-text">{event.depPort}</span>
                     <div className="flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-accent/30" />
                       <div className="w-8 h-[2px] bg-accent/20" />
                       <div className="w-1.5 h-1.5 rounded-full bg-accent" />
                     </div>
-                    <span className="text-text">{event.arrPort || '???'}</span>
+                    <span className="text-text">{event.arrPort}</span>
                   </div>
                 )}
               </div>
@@ -197,11 +197,11 @@ export const EventCard = ({ event, index }: { event: DutyEvent; index: number })
             <div className="flex flex-wrap gap-6 md:text-right">
               <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
                 <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign On</p>
-                <p className="text-2xl font-black text-text font-mono">{event.signOn || '--:--'}</p>
+                <p className="text-2xl font-black text-text font-mono">{event.signOn || event.std || '--:--'}</p>
               </div>
               <div className="bg-surface-2 px-6 py-4 rounded-2xl border border-border shadow-sm min-w-[120px]">
                 <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2 font-mono">Sign Off</p>
-                <p className="text-2xl font-black text-text font-mono">{event.signOff || '--:--'}</p>
+                <p className="text-2xl font-black text-text font-mono">{event.signOff || event.sta || '--:--'}</p>
               </div>
             </div>
           </div>
