@@ -261,11 +261,46 @@ export const Dashboard = () => {
   const [showRosterPicker, setShowRosterPicker] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Pick a random greeting on mount (useEffect avoids SSR/client hydration mismatch)
-  const [greeting, setGreeting] = useState('Hello');
+  // Typewriter greeting: cycles through GREETINGS, typing then erasing each one
+  const [displayedGreeting, setDisplayedGreeting] = useState('');
+  const [greetingIndex, setGreetingIndex] = useState(() =>
+    Math.floor(Math.random() * GREETINGS.length)
+  );
   useEffect(() => {
-    setGreeting(GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
-  }, []);
+    const target = GREETINGS[greetingIndex];
+    let frame: ReturnType<typeof setTimeout>;
+    let charIndex = 0;
+    let erasing = false;
+
+    function tick() {
+      if (!erasing) {
+        // Typing forward
+        charIndex++;
+        setDisplayedGreeting(target.slice(0, charIndex));
+        if (charIndex < target.length) {
+          frame = setTimeout(tick, 65);
+        } else {
+          // Fully typed — pause before erasing
+          frame = setTimeout(() => { erasing = true; tick(); }, 1400);
+        }
+      } else {
+        // Erasing backward
+        charIndex--;
+        setDisplayedGreeting(target.slice(0, charIndex));
+        if (charIndex > 0) {
+          frame = setTimeout(tick, 35);
+        } else {
+          // Fully erased — move to next greeting after brief pause
+          frame = setTimeout(() => {
+            setGreetingIndex((i) => (i + 1) % GREETINGS.length);
+          }, 300);
+        }
+      }
+    }
+
+    frame = setTimeout(tick, 65);
+    return () => clearTimeout(frame);
+  }, [greetingIndex]);
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Crew';
 
@@ -303,7 +338,10 @@ export const Dashboard = () => {
             Mission Control
           </div>
           <h2 className="text-5xl md:text-7xl font-bold tracking-tighter text-text">
-            <span className="text-accent">{greeting}</span>
+            <span className="text-accent">
+              {displayedGreeting}
+              <span className="animate-pulse">|</span>
+            </span>
             {', '}
             {firstName}.
           </h2>
