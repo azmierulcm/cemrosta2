@@ -23,12 +23,11 @@ export async function computeRecap(
   userId: string,
   period: PeriodConfig,
 ): Promise<RecapData> {
-  // Query by userId only — avoids needing a composite Firestore index.
-  // Year + month filtering is done in JS below.
-  const snap = await adminDb
-    .collection('rosters')
-    .where('userId', '==', userId)
-    .get();
+  // Fetch rosters + profile in parallel — both use the Admin SDK
+  const [snap, profileSnap] = await Promise.all([
+    adminDb.collection('rosters').where('userId', '==', userId).get(),
+    adminDb.collection('profiles').doc(userId).get(),
+  ]);
 
   // Filter to rosters whose year AND month fall within the period.
   // Handles month stored as abbreviation ("MAY") or zero-padded number ("05").
@@ -44,8 +43,10 @@ export async function computeRecap(
   const totalSectors = rosters.reduce((s, r) => s + (r.totalSectors ?? 0), 0);
   const totalKm = rosters.reduce((s, r) => s + (r.totalKm ?? 0), 0);
 
-  // Crew name from the most recent roster
-  const crewHandle = rosters[0]?.crewName ?? 'Crew';
+  // Crew name: prefer the profile full_name the user set in Settings,
+  // fall back to the name parsed from the roster PDF, then a generic label.
+  const profileName = (profileSnap.data()?.full_name as string | undefined)?.trim();
+  const crewHandle = profileName || rosters[0]?.crewName || 'Crew';
 
   // Aggregate destination visit counts across all rosters
   const destCounts = new Map<string, number>();

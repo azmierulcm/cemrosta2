@@ -13,6 +13,7 @@ const Geography = dynamic(() => import('react-simple-maps').then(m => m.Geograph
 const Marker = dynamic(() => import('react-simple-maps').then(m => m.Marker), { ssr: false });
 import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
 import { REGION_PATCH_VAR, RARITY_CSS, getRarityTier } from '@/lib/patches/rules';
+import { getPatchImageUrl } from '@/lib/patches/patch-images';
 import { formatVisitCount } from '@/lib/utils/format';
 import type { CatalogEntry } from '@/lib/data/destination-catalog';
 import type { EarnedDestination } from '@/lib/actions/destinations';
@@ -94,6 +95,7 @@ export function PatchDetailModal({ isOpen, onClose, entry, earned }: PatchDetail
   if (!entry) return null;
 
   const Illustration = ILLUSTRATIONS[entry.iata] ?? ILLUSTRATIONS['Generic'];
+  const patchImageUrl = getPatchImageUrl(entry.iata);
   const regionColor = REGION_PATCH_VAR[entry.region];
   const visits = earned?.visits ?? 0;
   const rarity = getRarityTier(visits);
@@ -158,15 +160,29 @@ export function PatchDetailModal({ isOpen, onClose, entry, earned }: PatchDetail
               <div
                 className="flex items-center justify-center mb-4"
                 style={{
-                  width: '160px',
-                  height: '160px',
+                  width: '200px',
+                  height: '200px',
                   color: regionColor,
-                  boxShadow: earned ? `inset 0 0 0 1.5px ${rarityColor}` : undefined,
+                  boxShadow: earned ? `0 0 0 1.5px ${rarityColor}` : undefined,
                   borderRadius: 'var(--radius-lg)',
-                  background: 'var(--bg)',
+                  background: patchImageUrl ? 'transparent' : 'var(--bg)',
                 }}
               >
-                <Illustration size={160} />
+                {patchImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={patchImageUrl}
+                    alt={`${entry.city} city patch`}
+                    style={{
+                      width: '200px',
+                      height: '200px',
+                      objectFit: 'contain',
+                      filter: earned ? undefined : 'grayscale(1) opacity(0.35)',
+                    }}
+                  />
+                ) : (
+                  <Illustration size={160} />
+                )}
               </div>
 
               {/* Rarity pill */}

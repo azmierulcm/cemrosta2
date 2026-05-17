@@ -12,6 +12,7 @@ import type { EarnedDestination } from '@/lib/actions/destinations';
 import { formatVisitCount } from '@/lib/utils/format';
 import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
 import { getRarityTier, RARITY_CSS } from '@/lib/patches/rules';
+import { getPatchImageUrl } from '@/lib/patches/patch-images';
 import { PatchDetailModal } from './PatchDetailModal';
 
 interface PatchCardProps {
@@ -30,6 +31,7 @@ function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardPro
   const rarityBorder = rarity ? RARITY_CSS[rarity] : null;
 
   const Illustration = ILLUSTRATIONS[entry.iata] ?? ILLUSTRATIONS['Generic'];
+  const patchImageUrl = getPatchImageUrl(entry.iata);
 
   const label = isUnlocked
     ? `${entry.city} (${entry.iata}) — visited ${earned!.visits} time${earned!.visits !== 1 ? 's' : ''}`
@@ -98,13 +100,23 @@ function PatchCard({ entry, earned, index, reduceMotion, onClick }: PatchCardPro
 
         {/* Illustration or lock */}
         {isUnlocked ? (
-          <div
-            className="w-[72px] h-[72px]"
-            style={{ color: regionColor }}
-            aria-hidden="true"
-          >
-            <Illustration size={72} />
-          </div>
+          patchImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={patchImageUrl}
+              alt={`${entry.city} patch`}
+              aria-hidden="true"
+              className="w-[120px] h-[120px] object-contain"
+            />
+          ) : (
+            <div
+              className="w-[72px] h-[72px]"
+              style={{ color: regionColor }}
+              aria-hidden="true"
+            >
+              <Illustration size={72} />
+            </div>
+          )
         ) : (
           <Lock
             size={33}
