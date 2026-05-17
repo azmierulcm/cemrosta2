@@ -191,7 +191,8 @@ export function DestinationsGrid({ earnedDestinations }: DestinationsGridProps) 
 
       {/* Patch grid */}
       <div
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"
+        className="grid gap-3"
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}
       >
         {DESTINATION_CATALOG.map((entry, i) => (
           <PatchCard
