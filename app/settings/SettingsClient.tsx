@@ -70,7 +70,7 @@ function SelectWrapper({ children }: { children: React.ReactNode }) {
 
 /* ── Main component ───────────────────────────────────────────────────────── */
 export default function SettingsClient() {
-  const { user, profile, setProfile } = useAuth();
+  const { user, profile, setProfile, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isOnboarding = searchParams.get('onboarding') === '1';
@@ -101,10 +101,10 @@ export default function SettingsClient() {
     }
   }, [profile]);
 
-  // Redirect unauthenticated visitors
+  // Only redirect after auth has resolved — user starts null before Firebase responds
   useEffect(() => {
-    if (!user && !saving) router.replace('/');
-  }, [user, saving, router]);
+    if (!authLoading && !user && !saving) router.replace('/');
+  }, [authLoading, user, saving, router]);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -146,6 +146,15 @@ export default function SettingsClient() {
       setSaving(false);
     }
   };
+
+  // Show spinner while Firebase resolves auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-32">
