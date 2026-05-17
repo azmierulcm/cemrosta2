@@ -389,8 +389,11 @@ export const Dashboard = () => {
             onClick={handleExport}
             className="bg-accent text-accent-fg px-10 py-4 rounded-full font-bold text-lg flex items-center gap-3 shadow-xl shadow-accent/10 hover:bg-accent-hover transition-all active:scale-95"
           >
-            <Download className="w-6 h-6" strokeWidth={2.5} />
-            Download ICS
+            <Calendar className="w-5 h-5" strokeWidth={2.5} />
+            <span className="flex flex-col items-start leading-tight">
+              <span>Add to Calendar</span>
+              <span className="text-[10px] font-[600] opacity-70 tracking-wide">Google · Apple · Outlook</span>
+            </span>
           </button>
         </div>
       </div>
