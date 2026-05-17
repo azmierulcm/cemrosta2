@@ -1,22 +1,20 @@
 /**
- * Maps IATA airport codes to their corresponding city patch PNG filename.
+ * Maps IATA airport codes to their city patch PNG filename.
  * Images live at: public/images/city_patches/{filename}
- *
- * Codes not listed here fall back to the inline SVG illustration.
- * Add entries as new artwork is created.
+ * Codes not listed fall back to the inline SVG illustration.
  */
 export const PATCH_IMAGE_MAP: Record<string, string> = {
   // Malaysia
   KUL: 'kuala_lumpur_patch.png',
-  JHB: 'johor_bahru_patch.png',
+  JHB: 'johor_bahru_patch.png',       // pending
   KBR: 'kota_bharu_patch.png',
-  BKI: 'kota_kinabalu_patch.png',
+  BKI: 'kota_kinabalu_patch.png',     // pending
   TGG: 'kuala_terengganu_patch.png',
-  KCH: 'kuching_patch.png',
+  KCH: 'kuching_patch.png',           // pending
   LBU: 'labuan_patch.png',
-  LGK: 'langkawi_patch.png',
+  LGK: 'langkawi_patch.png',          // pending
   MYY: 'miri_patch.png',
-  PEN: 'penang_patch.png',
+  PEN: 'penang_patch.png',            // pending
   SDK: 'sandakan_patch.png',
   SBW: 'sibu_patch.png',
   TWU: 'tawau_patch.png',
@@ -25,7 +23,6 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   SIN: 'singapore_patch.png',
   BKK: 'bangkok_patch.png',
   HKT: 'phuket_patch.png',
-  DMK: 'don_mueang_patch.png',
   CGK: 'jakarta_patch.png',
   DPS: 'bali_patch.png',
   SUB: 'surabaya_patch.png',
@@ -35,24 +32,19 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   HAN: 'hanoi_patch.png',
   SGN: 'ho_chi_minh_city_patch.png',
   DAD: 'da_nang_patch.png',
-  PQC: 'phu_quoc_patch.png',
-  KTI: 'kertajati_patch.png',
   // East Asia
   HKG: 'hong_kong_patch.png',
-  // CAN: 'guangzhou_patch.png', // artwork pending
+  CAN: 'guangzhou_patch.png',
   PVG: 'shanghai_patch.png',
-  PEK: 'beijing_capital_patch.png',
-  PKX: 'beijing_daxing_patch.png',
+  PEK: 'beijing_patch.png',
+  PKX: 'beijing_patch.png',
   SZX: 'shenzhen_patch.png',
   XMN: 'xiamen_patch.png',
-  TFU: 'chengdu_tianfu_patch.png',
-  CKG: 'chongqing_patch.png',
-  HGH: 'hangzhou_patch.png',
+  TFU: 'chengdu_patch.png',
   NRT: 'japan_patch.png',
   KIX: 'osaka_patch.png',
   ICN: 'seoul_patch.png',
   TPE: 'taipei_patch.png',
-  MFM: 'macau_patch.png',
   // Oceania
   SYD: 'sydney_patch.png',
   MEL: 'melbourne_patch.png',
@@ -61,7 +53,6 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   AKL: 'auckland_patch.png',
   // Middle East
   DOH: 'doha_patch.png',
-  DXB: 'dubai_patch.png',
   JED: 'jeddah_patch.png',
   MED: 'medina_patch.png',
   // Europe
@@ -81,7 +72,7 @@ export const PATCH_IMAGE_MAP: Record<string, string> = {
   MLE: 'male_patch.png',
 };
 
-/** Returns the URL path for a city patch PNG, or null if no artwork exists yet. */
+/** Returns the URL for a city patch PNG, or null if no artwork exists yet. */
 export function getPatchImageUrl(iata: string): string | null {
   const filename = PATCH_IMAGE_MAP[iata];
   if (!filename) return null;
