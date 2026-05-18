@@ -5,7 +5,7 @@ import { Navbar } from '@/components/shared/Navbar';
 import { Footer } from '@/components/shared/Footer';
 import { ProfileFilled } from '@/components/product/profile/ProfileFilled';
 import { ProfileEmptyState } from '@/components/product/profile/ProfileEmptyState';
-import { RecapCardModal } from '@/components/product/profile/RecapCardModal';
+import { RecapModal } from '@/components/product/profile/RecapModal';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { getLifetimeDestinations, type EarnedDestination } from '@/lib/actions/destinations';
@@ -99,10 +99,11 @@ export default function ProfileClient() {
       {hasRosters && <Footer />}
 
       {user && (
-        <RecapCardModal
+        <RecapModal
           isOpen={isRecapOpen}
           onClose={() => setIsRecapOpen(false)}
           userId={user.uid}
+          earnedDestinations={earnedDestinations}
         />
       )}
     </main>
