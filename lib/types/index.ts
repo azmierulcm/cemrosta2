@@ -40,4 +40,6 @@ export interface RosterData {
   crewName?: string;
   destinations?: Destination[];
   stats?: RosterStats;
+  /** Structured parse report — present only when returned from parseRosterPreview */
+  parseReport?: import('@/lib/parser/report').ParseReport;
 }

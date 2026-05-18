@@ -1,5 +1,10 @@
 export type DutyType = 'FLIGHT' | 'STANDBY' | 'OFF' | 'TRAINING' | 'GROUND';
 
+// Re-export telemetry types so callers only need one import path
+export type { ParseLogEntry, LogLevel } from './logger';
+export type { ConfidenceScore, ConfidenceGrade, ConfidenceBreakdown } from './confidence';
+export type { ParseReport, ParseStatus } from './report';
+
 export interface ParsedFlight {
   flightNumber: string;
   depPort: string;
