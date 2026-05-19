@@ -64,6 +64,61 @@ function flag(cc: string): string {
 
 // ── Distance from KUL (km) for longestRoute highlight ────────────────────────
 
+// ── IATA code → city patch filename in /images/city_patches/ ─────────────────
+
+const IATA_PATCH: Record<string, string> = {
+  // Malaysia
+  KUL: 'kuala_lumpur_patch.png', PEN: 'penang_patch.png',
+  LGK: 'langkawi_patch.png',     JHB: 'johor_bahru_patch.png',
+  KBR: 'kota_bharu_patch.png',   KUA: 'kuantan_patch.png',
+  TGG: 'kuala_terengganu_patch.png',
+  BKI: 'kota_kinabalu_patch.png', KCH: 'kuching_patch.png',
+  MYY: 'miri_patch.png',          BTU: 'bintulu_patch.png',
+  SDK: 'sandakan_patch.png',      TWU: 'tawau_patch.png',
+  LBU: 'labuan_patch.png',        AOR: 'alor_setar_patch',
+  // Southeast Asia
+  SIN: 'singapore_patch.png',    BKK: 'bangkok_patch.png',
+  HKT: 'phuket_patch.png',       CNX: 'chiang_mai_patch.png',
+  MNL: 'manila_patch.png',       CGK: 'jakarta_patch.png',
+  SUB: 'surabaya_patch.png',     DPS: 'bali_patch.png',
+  JOG: 'yogyakarta_patch',       UPG: 'makassar_patch.png',
+  BPN: 'balikpapan_patch.png',   PKU: 'pekanbaru_patch.png',
+  KNO: 'medan_patch.png',        PNH: 'phnom_penh_patch.png',
+  SGN: 'ho_chi_minh_city_patch.png', HAN: 'hanoi_patch.png',
+  DAD: 'da_nang_patch.png',      RGN: 'yangon_patch.png',
+  // East Asia
+  HKG: 'hong_kong_patch.png',    TPE: 'taipei_patch.png',
+  PEK: 'beijing_patch.png',      PVG: 'shanghai_patch.png',
+  CSX: 'changsha_patch.png',     CTU: 'chengdu_patch.png',
+  TFU: 'chengdu_patch.png',      XMN: 'xiamen_patch.png',
+  CAN: 'guangzhou_patch.png',    SZX: 'shenzhen_patch.png',
+  ICN: 'seoul_patch.png',        NRT: 'japan_patch.png',
+  HND: 'japan_patch.png',        FUK: 'fukuoka_patch.png',
+  KIX: 'osaka_patch.png',
+  // South Asia
+  DEL: 'delhi_patch.png',        BOM: 'mumbai_patch.png',
+  MAA: 'chennai_patch.png',      CCU: 'kolkata_patch.png',
+  BLR: 'bengaluru_patch.png',    HYD: 'hyderabad_patch.png',
+  COK: 'kochi_patch.png',        AMD: 'ahmedabad_patch.png',
+  ATQ: 'amritsar_patch.png',     TRV: 'thiruvananthapuram_patch.png',
+  CMB: 'colombo_patch.png',      DAC: 'dhaka_patch.png',
+  KTM: 'kathmandu_patch.png',
+  // Middle East
+  DOH: 'doha_patch.png',         JED: 'jeddah_patch.png',
+  MED: 'medina_patch.png',
+  // Maldives
+  MLE: 'male_patch.png',
+  // Europe
+  LHR: 'london_patch.png',       LGW: 'london_patch.png',
+  CDG: 'paris_patch.png',
+  // Oceania
+  SYD: 'sydney_patch.png',       MEL: 'melbourne_patch.png',
+  BNE: 'brisbane_patch.png',     PER: 'perth_patch.png',
+  ADL: 'adelaide_patch',         AKL: 'auckland_patch.png',
+};
+
+// ── Distance from KUL (km) for longestRoute highlight ────────────────────────
+
 const KUL_DISTANCE_KM: Record<string, number> = {
   SIN: 316,   BKK: 1180,  CGK: 1160,  DPS: 2140,  KNO: 664,
   UPG: 2050,  BPN: 1545,  PKU: 600,   JOG: 1550,  PNH: 1002,
@@ -591,7 +646,7 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/city-patches/${d.code}.png`}
+                      src={`/images/city_patches/${IATA_PATCH[d.code] ?? `${d.code.toLowerCase()}_patch.png`}`}
                       alt={`${d.city} stamp`}
                       className="h-full w-full object-contain p-2"
                       onError={(e) => {
