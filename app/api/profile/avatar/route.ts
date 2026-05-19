@@ -46,10 +46,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Build the standard Firebase Storage download URL (token-based, no ACL required)
-    const bucket     = adminBucket.name;
-    const encodedPath = encodeURIComponent(filePath);
-    const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+    // Build the standard Firebase Storage download URL (token-based, no ACL required).
+    // The serving bucket name for the URL is always the firebasestorage.app domain.
+    const servingBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? adminBucket.name;
+    const encodedPath   = encodeURIComponent(filePath);
+    const downloadUrl   = `https://firebasestorage.googleapis.com/v0/b/${servingBucket}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 
     // ── Persist URL to Firestore profile ───────────────────────────────────
     await adminDb.collection('profiles').doc(uid).set(

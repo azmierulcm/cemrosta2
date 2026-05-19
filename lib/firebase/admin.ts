@@ -11,7 +11,8 @@ if (!getApps().length) {
       // .env stores \n as literal \\n — restore actual newlines
       privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    // Admin SDK needs the GCS bucket name (*.appspot.com), not the serving URL (*.firebasestorage.app)
+    storageBucket: process.env.FIREBASE_ADMIN_STORAGE_BUCKET ?? process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   })
 }
 
