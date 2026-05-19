@@ -85,9 +85,15 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid auth token' }, { status: 401 });
     }
 
-    // ── Delete all avatar files for this user ──────────────────────────────
-    const [files] = await adminBucket.getFiles({ prefix: `avatars/${uid}/profile.` });
-    await Promise.all(files.map((f) => f.delete().catch(() => null)));
+    // ── Delete avatar files for this user ─────────────────────────────────
+    // Avoid getFiles() (requires list permission). Instead try every possible
+    // extension directly — missing files are silently ignored.
+    const exts = ['jpg', 'jpeg', 'png', 'webp'];
+    await Promise.all(
+      exts.map((ext) =>
+        adminBucket.file(`avatars/${uid}/profile.${ext}`).delete().catch(() => null),
+      ),
+    );
 
     // ── Remove URL from Firestore ──────────────────────────────────────────
     await adminDb.collection('profiles').doc(uid).update({
