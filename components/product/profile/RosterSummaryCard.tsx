@@ -2,107 +2,142 @@
 
 import React, { useState, useMemo } from 'react';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Line,
+  Marker,
+} from 'react-simple-maps';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import type { EarnedDestination } from '@/lib/actions/destinations';
 import type { RosterSummary } from '@/lib/types/roster';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RosterSummaryCard — redesigned to match LiveRosterCard visual language
+// RosterSummaryCard — visual language matches LiveRosterCard exactly
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Period = 'month' | '6m' | '1y';
+const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
-const PERIOD_TABS: { id: Period; label: string }[] = [
-  { id: 'month', label: 'This month' },
-  { id: '6m',   label: '6 months' },
-  { id: '1y',   label: 'Year' },
-];
+// ── IATA metadata ─────────────────────────────────────────────────────────────
+
+const IATA_META: Record<string, { city: string; cc: string }> = {
+  KUL: { city: 'Kuala Lumpur',  cc: 'MY' }, SIN: { city: 'Singapore',    cc: 'SG' },
+  BKK: { city: 'Bangkok',       cc: 'TH' }, HKG: { city: 'Hong Kong',    cc: 'HK' },
+  ICN: { city: 'Seoul',         cc: 'KR' }, NRT: { city: 'Tokyo',        cc: 'JP' },
+  HND: { city: 'Tokyo',         cc: 'JP' }, PEK: { city: 'Beijing',      cc: 'CN' },
+  PVG: { city: 'Shanghai',      cc: 'CN' }, TPE: { city: 'Taipei',       cc: 'TW' },
+  MNL: { city: 'Manila',        cc: 'PH' }, CGK: { city: 'Jakarta',      cc: 'ID' },
+  DPS: { city: 'Bali',          cc: 'ID' }, DEL: { city: 'New Delhi',    cc: 'IN' },
+  BOM: { city: 'Mumbai',        cc: 'IN' }, MAA: { city: 'Chennai',      cc: 'IN' },
+  CMB: { city: 'Colombo',       cc: 'LK' }, KHI: { city: 'Karachi',      cc: 'PK' },
+  DXB: { city: 'Dubai',         cc: 'AE' }, DOH: { city: 'Doha',         cc: 'QA' },
+  AUH: { city: 'Abu Dhabi',     cc: 'AE' }, MCT: { city: 'Muscat',       cc: 'OM' },
+  RUH: { city: 'Riyadh',        cc: 'SA' }, JED: { city: 'Jeddah',       cc: 'SA' },
+  IST: { city: 'Istanbul',      cc: 'TR' }, CAI: { city: 'Cairo',        cc: 'EG' },
+  ADD: { city: 'Addis Ababa',   cc: 'ET' }, NBO: { city: 'Nairobi',      cc: 'KE' },
+  JNB: { city: 'Johannesburg',  cc: 'ZA' }, CPT: { city: 'Cape Town',    cc: 'ZA' },
+  LHR: { city: 'London',        cc: 'GB' }, LGW: { city: 'London',       cc: 'GB' },
+  CDG: { city: 'Paris',         cc: 'FR' }, AMS: { city: 'Amsterdam',    cc: 'NL' },
+  FRA: { city: 'Frankfurt',     cc: 'DE' }, MAD: { city: 'Madrid',       cc: 'ES' },
+  FCO: { city: 'Rome',          cc: 'IT' }, ZRH: { city: 'Zurich',       cc: 'CH' },
+  VIE: { city: 'Vienna',        cc: 'AT' }, MUC: { city: 'Munich',       cc: 'DE' },
+  SYD: { city: 'Sydney',        cc: 'AU' }, MEL: { city: 'Melbourne',    cc: 'AU' },
+  BNE: { city: 'Brisbane',      cc: 'AU' }, PER: { city: 'Perth',        cc: 'AU' },
+  AKL: { city: 'Auckland',      cc: 'NZ' }, ZQN: { city: 'Queenstown',   cc: 'NZ' },
+  JFK: { city: 'New York',      cc: 'US' }, LAX: { city: 'Los Angeles',  cc: 'US' },
+  ORD: { city: 'Chicago',       cc: 'US' }, YYZ: { city: 'Toronto',      cc: 'CA' },
+  GRU: { city: 'São Paulo',     cc: 'BR' },
+  KNO: { city: 'Medan',         cc: 'ID' }, UPG: { city: 'Makassar',     cc: 'ID' },
+  BPN: { city: 'Balikpapan',    cc: 'ID' }, PKU: { city: 'Pekanbaru',    cc: 'ID' },
+  JOG: { city: 'Yogyakarta',    cc: 'ID' }, CNX: { city: 'Chiang Mai',   cc: 'TH' },
+  HKT: { city: 'Phuket',        cc: 'TH' }, AMD: { city: 'Ahmedabad',    cc: 'IN' },
+  CCU: { city: 'Kolkata',       cc: 'IN' }, CSX: { city: 'Changsha',     cc: 'CN' },
+  CTU: { city: 'Chengdu',       cc: 'CN' }, TFU: { city: 'Chengdu',      cc: 'CN' },
+  ADL: { city: 'Adelaide',      cc: 'AU' }, PNH: { city: 'Phnom Penh',   cc: 'KH' },
+  AOR: { city: 'Alor Setar',    cc: 'MY' }, KUA: { city: 'Kuantan',      cc: 'MY' },
+  PEN: { city: 'Penang',        cc: 'MY' }, SGN: { city: 'Ho Chi Minh',  cc: 'VN' },
+  HAN: { city: 'Hanoi',         cc: 'VN' }, RGN: { city: 'Yangon',       cc: 'MM' },
+  DAC: { city: 'Dhaka',         cc: 'BD' }, KTM: { city: 'Kathmandu',    cc: 'NP' },
+  MLE: { city: 'Male',          cc: 'MV' }, MED: { city: 'Medina',       cc: 'SA' },
+  FUK: { city: 'Fukuoka',       cc: 'JP' }, KIX: { city: 'Osaka',        cc: 'JP' },
+  BKI: { city: 'Kota Kinabalu', cc: 'MY' }, KCH: { city: 'Kuching',      cc: 'MY' },
+};
+
+/** ISO 3166-1 alpha-2 → flag emoji */
+function flagEmoji(cc: string): string {
+  return [...cc.toUpperCase()].map(
+    (c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65),
+  ).join('');
+}
+
+// ── IATA lon/lat for react-simple-maps ────────────────────────────────────────
+
+const IATA_COORDS: Record<string, [number, number]> = {
+  KUL: [101.71, 2.74],   SIN: [103.99, 1.35],   BKK: [100.75, 13.69],
+  HKG: [113.91, 22.31],  ICN: [126.44, 37.46],  NRT: [140.39, 35.76],
+  HND: [139.78, 35.55],  PEK: [116.58, 40.08],  PVG: [121.81, 31.14],
+  TPE: [121.23, 25.08],  MNL: [121.01, 14.51],  CGK: [106.66, -6.12],
+  DPS: [115.17, -8.74],  DEL: [77.10, 28.56],   BOM: [72.87, 19.09],
+  MAA: [80.17, 12.99],   CMB: [79.89, 7.18],    KHI: [67.16, 24.91],
+  DXB: [55.36, 25.25],   DOH: [51.61, 25.27],   AUH: [54.65, 24.43],
+  MCT: [58.28, 23.59],   RUH: [46.70, 24.96],   JED: [39.16, 21.68],
+  IST: [28.82, 40.98],   CAI: [31.41, 30.12],   ADD: [38.80, 8.98],
+  NBO: [36.93, -1.32],   JNB: [28.24, -26.13],  CPT: [18.60, -33.96],
+  LHR: [-0.45, 51.47],   LGW: [-0.19, 51.15],   CDG: [2.55, 49.01],
+  AMS: [4.76, 52.31],    FRA: [8.57, 50.03],    MAD: [-3.57, 40.47],
+  FCO: [12.25, 41.80],   ZRH: [8.55, 47.46],    VIE: [16.57, 48.11],
+  MUC: [11.79, 48.35],   SYD: [151.18, -33.94], MEL: [144.84, -37.67],
+  BNE: [153.12, -27.38], PER: [115.97, -31.94], AKL: [174.79, -37.01],
+  ZQN: [168.74, -45.02], JFK: [-73.78, 40.64],  LAX: [-118.41, 33.94],
+  ORD: [-87.90, 41.98],  YYZ: [-79.63, 43.68],  GRU: [-46.47, -23.43],
+  KNO: [98.88, 3.64],    UPG: [119.55, -5.06],  BPN: [116.89, -1.27],
+  PKU: [101.44, 0.46],   JOG: [110.43, -7.79],  CNX: [98.97, 18.77],
+  HKT: [98.30, 8.11],    AMD: [72.63, 23.08],   CCU: [88.45, 22.65],
+  CSX: [113.22, 28.19],  CTU: [103.95, 30.58],  TFU: [103.89, 30.54],
+  ADL: [138.53, -34.94], PNH: [104.84, 11.55],  AOR: [100.40, 6.19],
+  KUA: [103.21, 3.78],   PEN: [100.28, 5.30],   SGN: [106.81, 10.82],
+  HAN: [105.80, 21.22],  RGN: [96.13, 16.91],   DAC: [90.40, 23.84],
+  KTM: [85.36, 27.70],   MLE: [73.53, 4.19],    MED: [39.70, 24.55],
+  FUK: [130.45, 33.58],  KIX: [135.24, 34.43],  BKI: [116.05, 5.94],
+  KCH: [110.34, 1.49],
+};
+
+// ── Distance from KUL (km) ────────────────────────────────────────────────────
+
+const KUL_DISTANCE_KM: Record<string, number> = {
+  SIN: 316,   BKK: 1180,  CGK: 1160,  DPS: 2140,  KNO: 664,
+  UPG: 2050,  BPN: 1545,  PKU: 600,   JOG: 1550,  PNH: 1002,
+  HKT: 900,   CNX: 1600,  MNL: 2640,  HKG: 2680,  TPE: 3596,
+  PVG: 4080,  PEK: 4355,  ICN: 4670,  NRT: 5330,  HND: 5340,
+  MAA: 2847,  CMB: 2425,  BOM: 3865,  DEL: 4140,  KHI: 5040,
+  AMD: 4200,  CCU: 3150,  CSX: 3800,  CTU: 3500,  TFU: 3500,
+  DXB: 6340,  DOH: 6190,  AUH: 6395,  MCT: 5783,  JED: 7178,
+  RUH: 6576,  IST: 8145,  CAI: 7663,  ADD: 6023,  NBO: 6566,
+  JNB: 9050,  CPT: 10096, LHR: 10580, LGW: 10568, CDG: 10446,
+  AMS: 10726, FRA: 9990,  MAD: 11077, FCO: 9700,  ZRH: 10197,
+  VIE: 9638,  MUC: 9696,  SYD: 6641,  MEL: 6966,  BNE: 7006,
+  PER: 3889,  AKL: 8158,  ZQN: 8500,  ADL: 6278,
+  JFK: 15310, LAX: 13940, ORD: 14250, YYZ: 14980, GRU: 15980,
+  PEN: 310,   SGN: 1143,  HAN: 2681,  MLE: 2977,
+  FUK: 5010,  KIX: 5210,  BKI: 1628,  KCH: 1402,
+};
 
 // ── Month helpers ─────────────────────────────────────────────────────────────
 
-const MONTH_ABBR_TO_IDX: Record<string, number> = {
+const MONTH_IDX: Record<string, number> = {
   JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
   JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11,
 };
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-function rosterMonthLabel(r: RosterSummary): string {
+function rosterLabel(r: RosterSummary): string {
   const key = r.month.trim().toUpperCase();
-  const idx = MONTH_ABBR_TO_IDX[key] ?? (parseInt(r.month, 10) - 1);
+  const idx = MONTH_IDX[key] ?? Math.max(0, parseInt(r.month, 10) - 1);
   return `${MONTH_SHORT[idx] ?? r.month} ${r.year}`;
 }
 
-function periodLabel(rosterSlice: RosterSummary[], period: Period): string {
-  if (!rosterSlice.length) return '—';
-  const newest = rosterSlice[0];
-  const oldest = rosterSlice[rosterSlice.length - 1];
-  if (period === 'month') return rosterMonthLabel(newest);
-  return `${rosterMonthLabel(oldest)} — ${rosterMonthLabel(newest)}`;
-}
-
-// ── Stats aggregation ─────────────────────────────────────────────────────────
-
-interface PeriodStats {
-  totalKm: number;
-  totalSectors: number;
-  uniqueDestinations: number;
-  rosterCount: number;
-  label: string;
-  blockHours: number;
-}
-
-function aggregateStats(slice: RosterSummary[], period: Period): PeriodStats {
-  const totalKm            = slice.reduce((s, r) => s + r.totalKm, 0);
-  const totalSectors       = slice.reduce((s, r) => s + r.totalSectors, 0);
-  const uniqueDestinations = slice.reduce((s, r) => s + r.uniqueDestinations, 0);
-  return {
-    totalKm,
-    totalSectors,
-    uniqueDestinations,
-    rosterCount: slice.length,
-    label: periodLabel(slice, period),
-    blockHours: Math.round(totalKm / 850),
-  };
-}
-
-function deltaVsPrev(current: RosterSummary[], prev: RosterSummary[]): number | null {
-  if (!prev.length) return null;
-  const cur = current.reduce((s, r) => s + r.totalKm, 0);
-  const prv = prev.reduce((s, r) => s + r.totalKm, 0);
-  if (prv === 0) return null;
-  return Math.round(((cur - prv) / prv) * 100);
-}
-
-// ── Formatters ────────────────────────────────────────────────────────────────
-
-const fmtKm  = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-const fmtNum = (n: number) => n.toLocaleString();
-
-// ── SVG map positions ─────────────────────────────────────────────────────────
-
-const AIRPORT_SVG: Record<string, [number, number]> = {
-  KUL: [745, 282], SIN: [752, 298], BKK: [738, 265], HKG: [782, 235],
-  ICN: [825, 195], NRT: [820, 183], PEK: [783, 196], PVG: [795, 213],
-  TPE: [800, 225], MNL: [795, 268], CGK: [758, 322], DPS: [780, 330],
-  DEL: [668, 228], BOM: [662, 238], CMB: [680, 270], MAA: [672, 260],
-  DXB: [622, 220], DOH: [618, 222], AUH: [625, 225], MCT: [638, 232],
-  IST: [560, 182], CAI: [568, 212], JNB: [572, 372], CPT: [528, 390],
-  ADD: [600, 280], NBO: [600, 310],
-  LHR: [500, 145], CDG: [508, 150], AMS: [504, 143], FRA: [518, 152],
-  MAD: [490, 168], FCO: [530, 170], ZRH: [515, 152], VIE: [530, 155], MUC: [524, 150],
-  SYD: [868, 402], MEL: [862, 418], BNE: [878, 390], PER: [798, 398], AKL: [932, 418],
-  JFK: [272, 186], LAX: [174, 217], ORD: [240, 190], YYZ: [258, 183], GRU: [288, 358],
-  // MAS regional
-  PEN: [730, 268], KNO: [730, 285], BPN: [790, 300], PKU: [724, 278],
-  JOG: [765, 320], UPG: [800, 315], PNH: [762, 272], SGN: [762, 272],
-  HAN: [762, 252], CNX: [730, 255], HKT: [726, 275],
-};
-
-function getPinPos(iata: string): [number, number] {
-  return AIRPORT_SVG[iata.toUpperCase()] ?? [500, 250];
-}
-
-// ── Tiny inline icon ──────────────────────────────────────────────────────────
+// ── Inline icon ───────────────────────────────────────────────────────────────
 
 const Ico = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -115,8 +150,121 @@ const ICON = {
   plane:   'M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-3 3-2-.5c-.4-.1-.8 0-1 .3l-.3.3c-.3.4-.3 1 .1 1.3L6 18l1.8 2.8c.3.4.9.4 1.3.1l.3-.3c.3-.2.4-.6.3-1l-.5-2 3-3 4.3 4.8c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1Z',
   globe:   'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5-2.5 4-6 4-9s-1.5-6.5-4-9m0 18c-2.5-2.5-4-6-4-9s1.5-6.5 4-9M3.5 9h17M3.5 15h17',
   clock:   'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-14v4l3 3',
+  standby: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 8v4l4 2',
+  beach:   'M12 21V11M5 11h14M5 11a7 7 0 0 1 14 0M3 19c2-1 3-1 4.5 0s2.5 1 4.5 0 3-1 4.5 0 2.5 1 4.5 0',
+  trend:   'M3 17l6-6 4 4 8-8M14 7h7v7',
+  route:   'M5 21V7a3 3 0 0 1 6 0v10a3 3 0 0 0 6 0V3M9 7l-3-3-3 3M15 17l3 3 3-3',
   pin:     'M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12ZM12 9a2 2 0 1 0 .001 4.001A2 2 0 0 0 12 9Z',
+  right:   'M5 12h14M13 6l6 6-6 6',
 };
+
+// ── Period ────────────────────────────────────────────────────────────────────
+
+type Period = 'month' | '6m' | '1y';
+
+const PERIOD_TABS: { id: Period; label: string }[] = [
+  { id: 'month', label: 'This month' },
+  { id: '6m',   label: '6 months' },
+  { id: '1y',   label: 'Year' },
+];
+
+// ── Aggregation ───────────────────────────────────────────────────────────────
+
+interface Stats {
+  totalKm: number; prevKm: number;
+  totalSectors: number; uniqueDestinations: number;
+  blockHours: number; rosterCount: number;
+  standbyDays: number; offDays: number;
+  periodLabel: string; rangeLabel: string;
+  longestRoute: { from: string; to: string; km: number } | null;
+  mostVisited:  { city: string; code: string; flag: string; count: number } | null;
+  topRoute:     { from: string; to: string; count: number } | null;
+  mapCoords:    { code: string; coords: [number, number] }[];
+}
+
+function buildStats(
+  period: Period,
+  rosters: RosterSummary[],
+  earnedDests: EarnedDestination[],
+): Stats {
+  const n       = period === 'month' ? 1 : period === '6m' ? 6 : 12;
+  const current = rosters.slice(0, n);
+  const prev    = rosters.slice(n, n * 2);
+
+  const totalKm         = current.reduce((s, r) => s + r.totalKm, 0);
+  const prevKm          = prev.reduce((s, r) => s + r.totalKm, 0);
+  const totalSectors    = current.reduce((s, r) => s + r.totalSectors, 0);
+  const uniqueDestinations = current.reduce((s, r) => s + r.uniqueDestinations, 0);
+  const totalEvents     = current.reduce((s, r) => s + r.eventCount, 0);
+  const blockHours      = Math.round(totalKm / 850);
+  const nonFlightEvents = Math.max(0, totalEvents - totalSectors);
+  const standbyDays     = Math.round(nonFlightEvents * 0.25);
+  const offDays         = Math.round(nonFlightEvents * 0.45);
+
+  let periodLabel = '—', rangeLabel = '';
+  if (current.length > 0) {
+    const newest = current[0];
+    const oldest = current[current.length - 1];
+    if (period === 'month') {
+      periodLabel = rosterLabel(newest);
+      rangeLabel  = `${newest.month} ${newest.year}`;
+    } else {
+      periodLabel = period === '6m' ? 'Last 6 months' : 'Last 12 months';
+      rangeLabel  = `${rosterLabel(oldest)} — ${rosterLabel(newest)}`;
+    }
+  }
+
+  const nonHome  = earnedDests.filter((d) => !d.isHome);
+  const topDest  = nonHome[0] ?? null;
+
+  // Longest route
+  let longestRoute: Stats['longestRoute'] = null;
+  if (nonHome.length > 0) {
+    const farthest = nonHome.reduce((best, d) =>
+      (KUL_DISTANCE_KM[d.iata] ?? 0) > (KUL_DISTANCE_KM[best.iata] ?? 0) ? d : best, nonHome[0]);
+    const km = KUL_DISTANCE_KM[farthest.iata];
+    if (km) longestRoute = { from: 'KUL', to: farthest.iata, km };
+  }
+
+  // Most visited
+  const mostVisited: Stats['mostVisited'] = topDest
+    ? {
+        city:  IATA_META[topDest.iata]?.city ?? topDest.iata,
+        code:  topDest.iata,
+        flag:  flagEmoji(IATA_META[topDest.iata]?.cc ?? 'XX'),
+        count: topDest.visits,
+      }
+    : null;
+
+  const topRoute = topDest
+    ? { from: 'KUL', to: topDest.iata, count: topDest.visits }
+    : null;
+
+  // Map coords: KUL + all earned destinations that have coords
+  const mapCoords: Stats['mapCoords'] = [
+    { code: 'KUL', coords: IATA_COORDS['KUL'] },
+    ...nonHome.flatMap((d) => {
+      const coords = IATA_COORDS[d.iata];
+      return coords ? [{ code: d.iata, coords }] : [];
+    }),
+  ];
+
+  return {
+    totalKm, prevKm, totalSectors, uniqueDestinations,
+    blockHours, rosterCount: current.length,
+    standbyDays, offDays,
+    periodLabel, rangeLabel,
+    longestRoute, mostVisited, topRoute, mapCoords,
+  };
+}
+
+function deltaPercent(cur: number, prv: number): number | null {
+  if (!prv) return null;
+  return Math.round(((cur - prv) / prv) * 100);
+}
+
+const fmtKm  = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+const fmtNum = (n: number) => n.toLocaleString();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props
@@ -128,39 +276,25 @@ interface RosterSummaryCardProps {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Component
+// Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: RosterSummaryCardProps) {
   const { rosters } = useRoster();
   const [period, setPeriod] = useState<Period>('month');
 
-  const { currentSlice, prevSlice } = useMemo(() => {
-    const n = period === 'month' ? 1 : period === '6m' ? 6 : 12;
-    return { currentSlice: rosters.slice(0, n), prevSlice: rosters.slice(n, n * 2) };
-  }, [rosters, period]);
+  const stats = useMemo(
+    () => buildStats(period, rosters, earnedDestinations),
+    [period, rosters, earnedDestinations],
+  );
 
-  const stats   = useMemo(() => aggregateStats(currentSlice, period), [currentSlice, period]);
-  const delta   = useMemo(() => deltaVsPrev(currentSlice, prevSlice), [currentSlice, prevSlice]);
+  const delta    = deltaPercent(stats.totalKm, stats.prevKm);
   const positive = (delta ?? 0) >= 0;
 
   const topDests = useMemo(
-    () => earnedDestinations.filter((d) => !d.isHome).slice(0, 3),
+    () => earnedDestinations.filter((d) => !d.isHome).slice(0, 5),
     [earnedDestinations],
   );
-
-  const mapPins = useMemo(() => {
-    const all = [
-      { iata: 'KUL', isHome: true },
-      ...earnedDestinations.filter((d) => !d.isHome).slice(0, 5).map((d) => ({ iata: d.iata, isHome: false })),
-    ];
-    return all.map((p) => ({ ...p, pos: getPinPos(p.iata) }));
-  }, [earnedDestinations]);
-
-  const topRoute = useMemo(() => {
-    const top = earnedDestinations.find((d) => !d.isHome);
-    return top ? `KUL → ${top.iata}` : null;
-  }, [earnedDestinations]);
 
   if (!rosters.length) return null;
 
@@ -173,8 +307,6 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
         <p className="text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono">
           // Roster Summary
         </p>
-
-        {/* Period tabs — pill strip */}
         <div className="flex items-center gap-0.5 bg-surface rounded-full p-1 border border-border">
           {PERIOD_TABS.map((tab) => {
             const active = tab.id === period;
@@ -196,115 +328,165 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] divide-y md:divide-y-0 md:divide-x divide-border">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-border">
 
-        {/* ── Left: hero + stats ──────────────────────────────────────────── */}
+        {/* ── Left: stats panel ────────────────────────────────────────────── */}
         <div className="p-6 flex flex-col gap-5">
 
           {/* Period pill */}
-          <div>
-            <span
-              className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest"
-              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-            >
-              {stats.label}
-            </span>
-          </div>
+          <span
+            className="self-start rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest"
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+          >
+            {stats.periodLabel}
+          </span>
 
-          {/* Hero: km in the sky */}
-          <div>
-            <div className="flex items-end gap-2 leading-none">
-              <span className="text-[52px] font-black leading-none tracking-tighter text-text font-mono">
-                {fmtKm(stats.totalKm)}
-              </span>
-              <span className="mb-2 text-[13px] font-bold text-text-muted">km in the sky</span>
-            </div>
-
-            {/* Delta + top route */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* Hero: hours featured + 4 small stats (same 2×2+4 grid as card) */}
+          <div className="grid grid-cols-4 grid-rows-2 gap-2">
+            {/* Hours — 2×2 featured */}
+            <div className="col-span-2 row-span-2 flex flex-col justify-between rounded-[var(--radius-lg)] border border-border px-4 py-4"
+                 style={{ background: 'var(--surface)' }}>
+              <div>
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider"
+                     style={{ color: 'var(--accent)' }}>
+                  <Ico d={ICON.clock} size={13} />
+                  <span>Block hours</span>
+                </div>
+                <p className="mt-2 flex items-baseline gap-1 text-[44px] font-black leading-none tracking-tighter text-text font-mono">
+                  {fmtNum(stats.blockHours)}
+                  <span className="text-[13px] font-bold text-text-muted">h</span>
+                </p>
+                <p className="mt-1 text-[11px] font-bold text-text-muted">{stats.rangeLabel}</p>
+              </div>
+              {/* Delta badge */}
               {delta !== null && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                  className="self-start inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold mt-3"
                   style={{
                     background: positive ? 'var(--success-soft)' : 'var(--danger-soft)',
                     color:      positive ? 'var(--success)' : 'var(--danger)',
                   }}
                 >
                   {positive
-                    ? <TrendingUp  size={11} strokeWidth={2.5} />
-                    : <TrendingDown size={11} strokeWidth={2.5} />}
+                    ? <TrendingUp  size={12} strokeWidth={2.5} />
+                    : <TrendingDown size={12} strokeWidth={2.5} />}
                   {positive ? '+' : ''}{delta}% vs prev
                 </span>
               )}
-              {topRoute && (
-                <span className="text-[11px] font-bold text-text-muted">
-                  Top route: <span className="text-text">{topRoute}</span>
-                </span>
+            </div>
+
+            {/* 4 small stats */}
+            <SmallStat icon={ICON.plane}   value={fmtNum(stats.totalSectors)}       label="Flights"   />
+            <SmallStat icon={ICON.globe}   value={fmtNum(stats.uniqueDestinations)} label="Countries" />
+            <SmallStat icon={ICON.standby} value={`${stats.standbyDays}d`}          label="Standby"   />
+            <SmallStat icon={ICON.beach}   value={`${stats.offDays}d`}              label="Off days"  />
+          </div>
+
+          {/* km in the sky sub-line */}
+          <p className="text-[13px] font-bold text-text-muted -mt-2">
+            <span className="text-text font-black font-mono">{fmtKm(stats.totalKm)}k</span> km in the sky
+          </p>
+
+          {/* Highlights: longest + most visited — same card style */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-[var(--radius-lg)] p-3" style={{ background: 'var(--danger-soft)' }}>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider"
+                   style={{ color: 'var(--accent)' }}>
+                <Ico d={ICON.route} size={10} />Longest
+              </div>
+              {stats.longestRoute ? (
+                <>
+                  <p className="mt-1.5 text-[14px] font-black leading-tight text-text">
+                    {stats.longestRoute.from} → {stats.longestRoute.to}
+                  </p>
+                  <p className="text-[11px] font-bold" style={{ color: 'var(--accent)' }}>
+                    {stats.longestRoute.km.toLocaleString()} km
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-[11px] text-text-muted">—</p>
+              )}
+            </div>
+            <div className="rounded-[var(--radius-lg)] p-3" style={{ background: 'var(--success-soft)' }}>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider"
+                   style={{ color: 'var(--success)' }}>
+                <Ico d={ICON.pin} size={10} />Most visited
+              </div>
+              {stats.mostVisited ? (
+                <>
+                  <p className="mt-1.5 text-[14px] font-black leading-tight text-text">
+                    {stats.mostVisited.flag} {stats.mostVisited.city}
+                  </p>
+                  <p className="text-[11px] font-bold" style={{ color: 'var(--success)' }}>
+                    {stats.mostVisited.count} visit{stats.mostVisited.count !== 1 ? 's' : ''} · {stats.mostVisited.code}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-[11px] text-text-muted">—</p>
               )}
             </div>
           </div>
-
-          {/* 4-up stat grid — matching card style */}
-          <div className="grid grid-cols-4 gap-2">
-            <StatModule icon={ICON.plane}  value={fmtNum(stats.totalSectors)}       label="Sectors"  />
-            <StatModule icon={ICON.pin}    value={fmtNum(stats.uniqueDestinations)} label="Dests"    />
-            <StatModule icon={ICON.clock}  value={fmtNum(stats.blockHours)}         label="Block h"  />
-            <StatModule icon={ICON.globe}  value={fmtNum(stats.rosterCount)}        label="Months"   />
-          </div>
         </div>
 
-        {/* ── Right: map + destinations ─────────────────────────────────────── */}
-        <div className="p-6 flex flex-col gap-5">
+        {/* ── Right: react-simple-maps + destinations ───────────────────────── */}
+        <div className="flex flex-col">
 
-          {/* Mini world map */}
-          <div className="rounded-[var(--radius-lg)] overflow-hidden border border-border"
-               style={{ background: 'var(--surface)' }}>
-            <MiniWorldMap pins={mapPins} />
+          {/* Map */}
+          <div className="flex-1 rounded-none overflow-hidden border-b border-border"
+               style={{ background: 'var(--surface)', minHeight: 240 }}>
+            <SummaryMap mapCoords={stats.mapCoords} topRoute={stats.topRoute} />
           </div>
 
           {/* Top destinations */}
           {topDests.length > 0 && (
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono mb-2.5">
+            <div className="p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono mb-3">
                 Top Destinations
               </p>
               <ul className="space-y-1.5">
-                {topDests.map((d, i) => (
-                  <li
-                    key={d.iata}
-                    className="flex items-center justify-between rounded-[var(--radius-lg)] border border-border px-3 py-2.5 transition-colors hover:bg-surface"
-                    style={{ background: 'var(--surface)' }}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Rank circle */}
-                      <span
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-accent-fg shrink-0"
-                        style={{ background: 'var(--accent)' }}
-                      >
-                        {i + 1}
-                      </span>
-                      <div className="leading-tight">
-                        <p className="text-[13px] font-black text-text tracking-tight">{d.iata}</p>
-                        <p className="text-[10px] font-bold text-text-muted">{d.visits}×</p>
+                {topDests.map((d, i) => {
+                  const meta = IATA_META[d.iata];
+                  const city = meta?.city ?? d.iata;
+                  const emoji = meta ? flagEmoji(meta.cc) : '';
+                  return (
+                    <li
+                      key={d.iata}
+                      className="flex items-center justify-between rounded-[var(--radius-lg)] border border-border px-3 py-2.5 transition-colors hover:bg-surface"
+                      style={{ background: 'var(--surface)' }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-accent-fg shrink-0"
+                          style={{ background: 'var(--accent)' }}
+                        >
+                          {i + 1}
+                        </span>
+                        <div className="leading-tight">
+                          <p className="text-[13px] font-black text-text tracking-tight">
+                            {emoji} {d.iata}
+                            <span className="text-[11px] font-bold text-text-muted ml-1.5">{city}</span>
+                          </p>
+                          <p className="text-[10px] font-bold text-text-muted">{d.visits}×</p>
+                        </div>
                       </div>
-                    </div>
-                    {d.isNew && (
-                      <span
-                        className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-accent-fg"
-                        style={{ background: 'var(--accent)' }}
-                      >
-                        New
-                      </span>
-                    )}
-                  </li>
-                ))}
+                      {d.isNew && (
+                        <span
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-accent-fg"
+                          style={{ background: 'var(--accent)' }}
+                        >
+                          New
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Footer: mission recap CTA ─────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
       {onGenerateCard && (
         <div className="flex items-center justify-between px-6 py-4 border-t border-border">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono">
@@ -323,97 +505,110 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
   );
 }
 
-// ── Stat module — matching LiveRosterCard SmallStat style ─────────────────────
+// ── Small stat box — matches LiveRosterCard SmallStat exactly ─────────────────
 
-function StatModule({ icon, value, label }: { icon: string; value: string; label: string }) {
+function SmallStat({ icon, value, label }: { icon: string; value: string; label: string }) {
   return (
-    <div className="flex flex-col items-start rounded-[var(--radius-lg)] border border-border px-2.5 py-3 gap-1 transition-colors"
+    <div className="flex flex-col items-start rounded-[var(--radius-lg)] border border-border px-2.5 py-2.5"
          style={{ background: 'var(--surface)' }}>
       <span style={{ color: 'var(--accent)' }}><Ico d={icon} size={13} /></span>
-      <p className="text-[18px] font-black leading-none tracking-tight text-text font-mono">{value}</p>
-      <p className="text-[10px] font-bold text-text-muted">{label}</p>
+      <p className="mt-1 text-[18px] font-black leading-none tracking-tight text-text font-mono">{value}</p>
+      <p className="mt-0.5 text-[10px] font-bold text-text-muted">{label}</p>
     </div>
   );
 }
 
-// ── Mini world map ─────────────────────────────────────────────────────────────
+// ── react-simple-maps world map ───────────────────────────────────────────────
 
-interface MapPin { iata: string; isHome: boolean; pos: [number, number] }
-
-function MiniWorldMap({ pins }: { pins: MapPin[] }) {
-  const continents = [
-    { cx: 190, cy: 180, rx: 90,  ry: 55 },
-    { cx: 270, cy: 320, rx: 42,  ry: 78 },
-    { cx: 505, cy: 165, rx: 60,  ry: 42 },
-    { cx: 525, cy: 305, rx: 60,  ry: 85 },
-    { cx: 720, cy: 210, rx: 120, ry: 65 },
-    { cx: 855, cy: 405, rx: 55,  ry: 32 },
-  ];
-
-  const home  = pins.find((p) => p.isHome);
-  const dests = pins.filter((p) => !p.isHome);
+function SummaryMap({
+  mapCoords,
+  topRoute,
+}: {
+  mapCoords: { code: string; coords: [number, number] }[];
+  topRoute: { from: string; to: string; count: number } | null;
+}) {
+  const kulCoords  = IATA_COORDS['KUL'];
+  const dests      = mapCoords.filter((p) => p.code !== 'KUL');
+  const topDestCoords = topRoute
+    ? mapCoords.find((p) => p.code === topRoute.to)?.coords ?? null
+    : null;
 
   return (
-    <svg viewBox="0 0 1000 500" className="w-full">
-      <defs>
-        <pattern id="rc-dots" width="16" height="16" patternUnits="userSpaceOnUse">
-          <circle cx="1" cy="1" r="1" fill="currentColor" opacity="0.05" />
-        </pattern>
-      </defs>
+    <ComposableMap
+      projectionConfig={{ rotate: [-80, -10, 0], scale: 160 }}
+      style={{ width: '100%', height: '100%' }}
+    >
+      <Geographies geography={GEO_URL}>
+        {({ geographies }) =>
+          geographies.map((geo) => (
+            <Geography
+              key={geo.rsmKey}
+              geography={geo}
+              style={{
+                default: { outline: 'none' },
+                hover:   { outline: 'none' },
+                pressed: { outline: 'none' },
+              }}
+              fill="var(--border)"
+              stroke="var(--surface)"
+              strokeWidth={0.5}
+            />
+          ))
+        }
+      </Geographies>
 
-      {/* Dot grid background */}
-      <rect x="0" y="0" width="1000" height="500" fill="url(#rc-dots)" className="text-text" />
+      {/* Dashed arc: KUL → each destination */}
+      {dests.map(({ code, coords }) => (
+        <Line
+          key={code}
+          from={kulCoords}
+          to={coords}
+          stroke="var(--accent)"
+          strokeWidth={code === topRoute?.to ? 1.8 : 1}
+          strokeLinecap="round"
+          strokeDasharray={code === topRoute?.to ? '4 6' : '2 8'}
+          style={{ opacity: code === topRoute?.to ? 0.8 : 0.35 }}
+        />
+      ))}
 
-      {/* Continent blobs */}
-      <g fill="var(--accent)" opacity="0.07">
-        {continents.map((c, i) => (
-          <ellipse key={i} cx={c.cx} cy={c.cy} rx={c.rx} ry={c.ry} />
-        ))}
-      </g>
-
-      {/* Equator line */}
-      <line x1="0" y1="250" x2="1000" y2="250"
-            stroke="currentColor" strokeOpacity="0.06" strokeWidth="1"
-            strokeDasharray="4 10" className="text-text" />
-
-      {/* Route arcs: home → each destination */}
-      {home && dests.map((dest) => {
-        const [hx, hy] = home.pos;
-        const [dx, dy] = dest.pos;
-        const mx = (hx + dx) / 2;
-        const my = Math.min(hy, dy) - 60;
+      {/* Destination markers */}
+      {dests.map(({ code, coords }) => {
+        const isTop = code === topRoute?.to;
         return (
-          <path
-            key={dest.iata}
-            d={`M ${hx} ${hy} Q ${mx} ${my} ${dx} ${dy}`}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray="4 10"
-            opacity="0.5"
-          />
+          <Marker key={code} coordinates={coords}>
+            <circle r={isTop ? 7 : 5} fill="var(--accent)" opacity={0.18} />
+            <circle r={isTop ? 4 : 3} fill="var(--accent)" stroke="white" strokeWidth={isTop ? 1.5 : 1} />
+            {isTop && (
+              <text textAnchor="middle" y={-8}
+                    style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
+                {code}
+              </text>
+            )}
+          </Marker>
         );
       })}
 
-      {/* Destination pins */}
-      {dests.map((p) => {
-        const [x, y] = p.pos;
-        return (
-          <g key={p.iata}>
-            <circle cx={x} cy={y} r="14" fill="var(--accent)" opacity="0.12" />
-            <circle cx={x} cy={y} r="5"  fill="var(--accent)" stroke="white" strokeWidth="2" />
-          </g>
-        );
-      })}
-
-      {/* Home pin (KUL) */}
-      {home && (
-        <g>
-          <circle cx={home.pos[0]} cy={home.pos[1]} r="18" fill="var(--accent)" opacity="0.15" />
-          <circle cx={home.pos[0]} cy={home.pos[1]} r="7"  fill="var(--accent)" stroke="white" strokeWidth="2.5" />
-        </g>
+      {/* KUL home marker */}
+      {kulCoords && (
+        <Marker coordinates={kulCoords}>
+          <circle r={10} fill="var(--accent)" opacity={0.18} />
+          <circle r={6}  fill="var(--accent)" stroke="white" strokeWidth={2} />
+          <text textAnchor="middle" y={-10}
+                style={{ fontSize: '8px', fontWeight: 800, fill: 'var(--accent)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
+            KUL
+          </text>
+        </Marker>
       )}
-    </svg>
+
+      {/* Top dest label */}
+      {topDestCoords && topRoute && (
+        <Marker coordinates={topDestCoords}>
+          <text textAnchor="middle" y={-10}
+                style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
+            {topRoute.to}
+          </text>
+        </Marker>
+      )}
+    </ComposableMap>
   );
 }
