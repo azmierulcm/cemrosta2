@@ -636,19 +636,19 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
 
           {data.topDests.length > 0 ? (
             <div className="flex-1 flex flex-col">
-              {/* 2-column grid — large, beautiful patches */}
+              {/* 2-column grid — large, borderless patches */}
               <div className="grid grid-cols-2 gap-2 flex-1">
                 {data.topDests.slice(0, 2).map((d) => (
                   <div
                     key={d.code}
-                    className="relative overflow-hidden rounded-2xl ring-1 ring-black/8 flex flex-col items-center justify-center"
-                    style={{ background: 'white', minHeight: 100 }}
+                    className="relative overflow-hidden rounded-2xl flex flex-col items-center justify-center"
+                    style={{ background: '#F7F5F0', minHeight: 100 }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/images/city_patches/${IATA_PATCH[d.code] ?? `${d.code.toLowerCase()}_patch.png`}`}
                       alt={`${d.city} stamp`}
-                      className="h-full w-full object-contain p-2"
+                      className="h-full w-full object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('hidden');
@@ -661,7 +661,7 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
                     </div>
                     {/* City label overlay at the bottom */}
                     <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5"
-                         style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.95) 60%, transparent)' }}>
+                         style={{ background: 'linear-gradient(to top, rgba(247,245,240,0.96) 55%, transparent)' }}>
                       <p className="text-[8px] font-bold text-center leading-tight" style={{ color: '#222' }}>
                         {d.city}
                       </p>
