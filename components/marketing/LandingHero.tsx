@@ -2,117 +2,298 @@
 
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { CheckCircle2, ShieldCheck, Zap, Heart, ArrowRight } from 'lucide-react';
-import HeroAnimation from './HeroAnimation';
+import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Heart } from 'lucide-react';
 import { WaitlistSheet } from './WaitlistSheet';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
-const FORMAT_PILLS = [
-  { name: 'MAS AIMS', status: 'live' },
-  { name: 'AirAsia', status: 'soon' },
-  { name: 'Batik Air', status: 'soon' },
-  { name: 'SIA', status: 'soon' },
+// ── Real patch images for the hero preview ────────────────────────────────────
+const HERO_PATCHES = [
+  { src: '/images/city_patches/kuala_lumpur_patch.png', city: 'Kuala Lumpur', iata: 'KUL' },
+  { src: '/images/city_patches/london_patch.png',       city: 'London',       iata: 'LHR' },
+  { src: '/images/city_patches/singapore_patch.png',    city: 'Singapore',    iata: 'SIN' },
+  { src: '/images/city_patches/hong_kong_patch.png',    city: 'Hong Kong',    iata: 'HKG' },
 ];
 
+const FORMAT_PILLS = [
+  { name: 'MAS AIMS', status: 'live' },
+  { name: 'AirAsia',  status: 'soon' },
+  { name: 'Batik Air',status: 'soon' },
+  { name: 'SIA',      status: 'soon' },
+];
+
+// ── Mini roster tile ──────────────────────────────────────────────────────────
+function MiniTile({
+  date, status, from, to, flightNo, time, type,
+}: {
+  date: string; status: string; from: string; to: string;
+  flightNo: string; time: string; type: 'flight' | 'off' | 'standby';
+}) {
+  const band = type === 'flight'  ? 'bg-sky-50 text-sky-700'
+             : type === 'standby' ? 'bg-yellow-50 text-yellow-800'
+             :                      'bg-green-50 text-green-700';
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-sm text-[11px]">
+      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 ${band}`}>
+        <span className="font-bold text-[13px] tabular-nums">{date}</span>
+        <span className="font-bold uppercase tracking-wide text-[9px]">{status}</span>
+      </div>
+      {type === 'flight' ? (
+        <>
+          <div className="flex items-center justify-between px-2.5 py-1">
+            <span className="font-semibold text-neutral-700">{from}</span>
+            <span className="font-bold text-green-700 text-[10px]">{flightNo}</span>
+            <span className="font-semibold text-neutral-700">{to}</span>
+          </div>
+          <div className="flex items-center justify-between px-2.5 pb-1.5 text-neutral-500">
+            <span>{time}</span>
+          </div>
+        </>
+      ) : (
+        <div className="px-2.5 py-2 text-center text-neutral-400 font-medium uppercase tracking-wider text-[9px]">
+          {status}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Mini LiveRosterCard ───────────────────────────────────────────────────────
+function MiniRosterCard() {
+  return (
+    <div
+      className="w-[120px] rounded-[16px] overflow-hidden flex flex-col shadow-2xl shadow-black/20"
+      style={{ background: '#FFFCF8', border: '1px solid rgba(0,0,0,0.06)' }}
+    >
+      {/* Glow */}
+      <div className="relative p-2.5 flex flex-col gap-1.5" style={{ minHeight: 190 }}>
+        <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl"
+             style={{ background: '#FF385C', opacity: 0.12 }} />
+        {/* Header */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[7px] font-bold shrink-0"
+               style={{ background: 'linear-gradient(135deg,#FF385C,#E61E4D)' }}>
+            AC
+          </div>
+          <div>
+            <div className="text-[7px] font-bold text-[#222] leading-none">Ahmad Crew</div>
+            <div className="text-[6px] text-[#717171] leading-none mt-0.5">Captain · A350</div>
+          </div>
+        </div>
+        {/* Eyebrow */}
+        <div className="text-[6px] font-black uppercase tracking-widest mt-1"
+             style={{ color: '#FF385C' }}>
+          Stamps collected
+        </div>
+        {/* 2 patch images */}
+        <div className="grid grid-cols-2 gap-1">
+          {[
+            '/images/city_patches/london_patch.png',
+            '/images/city_patches/paris_patch.png',
+          ].map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={src} alt="" className="w-full aspect-square object-contain" />
+          ))}
+        </div>
+        {/* Stats */}
+        <div className="mt-auto grid grid-cols-2 gap-1">
+          {[['14h', 'Block hrs'], ['2', 'Sectors']].map(([val, label]) => (
+            <div key={label} className="rounded-lg p-1.5" style={{ background: '#F7F5F0' }}>
+              <div className="text-[9px] font-black text-[#222]">{val}</div>
+              <div className="text-[6px] text-[#717171]">{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Footer */}
+      <div className="px-2.5 py-1.5 text-center border-t" style={{ borderColor: '#F0EDE8' }}>
+        <span className="text-[6px] font-black tracking-widest text-[#B0ABA5] uppercase font-mono">
+          cemrosta.io
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Product preview panel ─────────────────────────────────────────────────────
+function ProductPreview() {
+  return (
+    <div className="relative w-full max-w-lg mx-auto lg:mx-0 select-none">
+
+      {/* Main app window */}
+      <div className="rounded-[1.5rem] border border-border bg-white shadow-2xl shadow-black/10 overflow-hidden">
+        {/* Browser chrome */}
+        <div className="flex items-center gap-1.5 px-4 py-3 bg-surface-2 border-b border-border">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+          <span className="w-2.5 h-2.5 rounded-full bg-green-400" />
+          <div className="flex-1 mx-3 bg-white border border-border rounded-full px-3 py-1 text-[10px] text-text-subtle font-mono">
+            cemrosta.vercel.app
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Recent Stamps */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-black uppercase italic tracking-tight text-text">Recent Stamps.</span>
+              <span className="text-[9px] font-black font-mono text-text-subtle bg-surface-2 border border-border px-2 py-0.5 rounded-full">
+                4 Unlocked
+              </span>
+            </div>
+            <div className="flex gap-3 overflow-hidden">
+              {HERO_PATCHES.map((p) => (
+                <div key={p.iata} className="flex flex-col items-center shrink-0 gap-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.src} alt={p.city} className="w-14 h-14 object-contain drop-shadow-sm" />
+                  <span className="text-[8px] font-black text-text truncate w-14 text-center">{p.city}</span>
+                  <span className="text-[8px] font-black text-text-muted font-mono">1×</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border" />
+
+          {/* Roster Details */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] font-black uppercase italic tracking-tight text-text">Roster Details.</span>
+              <div className="h-px flex-1 bg-border/50" />
+              <span className="text-[8px] font-black text-text-subtle font-mono uppercase tracking-widest">Tap to edit</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <MiniTile date="14" status="Duty" from="KUL" to="LHR" flightNo="MH001" time="23:50 → 06:10+" type="flight" />
+              <MiniTile date="15" status="Layover" from="" to="" flightNo="" time="" type="standby" />
+              <MiniTile date="16" status="Duty" from="LHR" to="KUL" flightNo="MH002" time="13:30 → 08:20+" type="flight" />
+              <MiniTile date="17" status="Rest" from="" to="" flightNo="" time="" type="off" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating LiveRosterCard */}
+      <motion.div
+        initial={{ opacity: 0, x: 20, y: 10 }}
+        animate={{ opacity: 1, x: 0, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.6 }}
+        className="absolute -right-4 -bottom-6 lg:-right-10"
+      >
+        <MiniRosterCard />
+      </motion.div>
+
+      {/* Floating badge: "Synced" */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7, duration: 0.5 }}
+        className="absolute -top-3 -left-4 flex items-center gap-1.5 bg-white border border-border rounded-full px-3 py-1.5 shadow-lg text-[10px] font-black text-success"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+        Calendar synced
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Main hero ─────────────────────────────────────────────────────────────────
 export const LandingHero = () => {
   const shouldReduceMotion = useReducedMotion();
   const { openAuthModal } = useAuth();
   const [waitlistAirline, setWaitlistAirline] = useState<string | null>(null);
 
+  const fade = (delay = 0) => shouldReduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, delay } };
+
   return (
-    <section className="pt-40 pb-24 px-4 min-h-[100svh] flex flex-col items-center bg-white relative overflow-hidden">
-      {/* Background radial glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-accent/3 blur-[120px] rounded-full -z-10" />
+    <section className="relative pt-32 pb-20 px-4 overflow-hidden bg-white">
+      {/* Background gradient */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/3 via-transparent to-transparent" />
 
-      <div className="max-w-5xl mx-auto text-center flex-1 flex flex-col items-center">
-        <motion.div
-          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <HeroAnimation />
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-center">
 
-          <h1 className="text-5xl md:text-8xl font-black tracking-tighter text-text mb-8 mt-12 max-w-5xl mx-auto leading-[0.95]">
-            Roster screenshots? <span className="text-accent">Sudah-lah.</span>
-          </h1>
+          {/* ── Left: copy ── */}
+          <div className="flex flex-col gap-8">
+            <motion.div {...fade(0)}>
+              <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-6">
+                {"// BUILT FOR CREW"}
+              </div>
+              <h1 className="text-5xl md:text-6xl xl:text-7xl font-black tracking-tighter text-text leading-[0.92] mb-6">
+                Roster screenshots?{' '}
+                <span className="text-accent italic">Sudah-lah.</span>
+              </h1>
+              <p className="text-lg md:text-xl text-text-muted font-bold leading-snug tracking-tight max-w-lg">
+                Drop your PDF roster. See your duties, sync your calendar, and build your lifetime digital passport — one city at a time.
+              </p>
+            </motion.div>
 
-          <p className="text-xl md:text-2xl text-text-muted mb-16 max-w-2xl mx-auto font-bold leading-tight tracking-tight">
-            Drop your roster PDF. Get a synced calendar, a digital passport of every city you&apos;ve flown to and plan off days like an adult with a calendar.
-          </p>
-        </motion.div>
+            <motion.div {...fade(0.15)} className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="flex items-center justify-center gap-3 bg-accent text-accent-fg px-8 py-4 rounded-full text-[15px] font-black shadow-xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
+              >
+                Get started free
+                <ArrowRight size={18} strokeWidth={3} />
+              </button>
+              <button
+                onClick={() => openAuthModal('login')}
+                className="flex items-center justify-center gap-3 border border-border px-8 py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
+              >
+                Sign in
+              </button>
+            </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="flex flex-col items-center gap-6 mb-16 w-full max-w-md"
-        >
-          <button
-            onClick={() => openAuthModal('signup')}
-            className="w-full bg-accent text-accent-fg px-10 py-6 rounded-full text-xl font-black shadow-2xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95 flex items-center justify-center gap-4"
-          >
-            Ditch the PDF Roster
-            <ArrowRight size={24} strokeWidth={3} />
-          </button>
-          <button
-            onClick={() => openAuthModal('login')}
-            className="text-text-muted font-bold text-sm hover:text-text transition-colors underline underline-offset-4"
-          >
-            Already a crew member? Sign in
-          </button>
-        </motion.div>
+            {/* Format pills */}
+            <motion.div {...fade(0.25)} className="flex flex-wrap gap-2">
+              {FORMAT_PILLS.map((pill) => (
+                <button
+                  key={pill.name}
+                  onClick={() => pill.status === 'soon' && setWaitlistAirline(pill.name)}
+                  className={`px-4 py-1.5 rounded-full text-[11px] font-black border uppercase tracking-widest flex items-center gap-2 transition-all ${
+                    pill.status === 'live'
+                      ? 'bg-accent/5 border-accent/20 text-accent'
+                      : 'bg-surface-2 border-border text-text-muted hover:border-text-subtle cursor-pointer'
+                  }`}
+                >
+                  {pill.name}
+                  {pill.status === 'live'
+                    ? <CheckCircle2 size={11} strokeWidth={3} />
+                    : <span className="opacity-40">· soon</span>}
+                </button>
+              ))}
+            </motion.div>
 
-        {/* Format Pills */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="flex flex-wrap justify-center gap-4 mb-16"
-        >
-          {FORMAT_PILLS.map((pill) => (
-            <button
-              key={pill.name}
-              onClick={() => pill.status === 'soon' && setWaitlistAirline(pill.name)}
-              className={`
-                px-8 py-3 rounded-full text-xs font-black transition-all flex items-center gap-3 border uppercase tracking-widest
-                ${pill.status === 'live'
-                  ? 'bg-accent/5 border-accent/10 text-accent shadow-sm'
-                  : 'bg-surface-2 border-border text-text-muted hover:border-text-subtle hover:text-text shadow-sm cursor-pointer'}
-              `}
+            {/* Trust strip */}
+            <motion.div {...fade(0.35)}
+              className="flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-black uppercase tracking-[0.2em] text-text-muted font-mono border-t border-border pt-6"
             >
-              {pill.name}
-              {pill.status === 'live'
-                ? <CheckCircle2 size={14} strokeWidth={3} />
-                : <span className="opacity-40">· soon</span>}
-            </button>
-          ))}
-        </motion.div>
-      </div>
+              {[
+                [Zap,          'MAS AIMS Support'],
+                [CheckCircle2, 'Lifetime Passport'],
+                [ShieldCheck,  'Your data, yours alone'],
+                [Heart,        'Built for crew'],
+              ].map(([Icon, label]) => (
+                <div key={label as string} className="flex items-center gap-2">
+                  {React.createElement(Icon as React.ElementType, { size: 13, className: 'text-accent' })}
+                  <span>{label as string}</span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
 
-      {/* Trust Strip */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        className="w-full max-w-7xl mx-auto mt-auto pt-16 border-t border-border flex flex-wrap justify-center md:justify-between items-center gap-10 text-[11px] md:text-[13px] font-black uppercase tracking-[0.3em] text-text-muted font-mono"
-      >
-        <div className="flex items-center gap-3">
-          <Zap size={16} className="text-accent" />
-          <span>MAS AIMS Support</span>
+          {/* ── Right: product preview ── */}
+          <motion.div
+            initial={shouldReduceMotion ? undefined : { opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, delay: 0.1 }}
+            className="relative pb-8 lg:pb-0"
+          >
+            <ProductPreview />
+          </motion.div>
         </div>
-        <div className="flex items-center gap-3">
-          <CheckCircle2 size={16} className="text-success" />
-          <span>Lifetime Destination Passport</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <ShieldCheck size={16} className="text-accent" />
-          <span>Your Data, Yours Alone</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Heart size={16} className="text-accent" />
-          <span>Built for Crew</span>
-        </div>
-      </motion.div>
+      </div>
 
       <WaitlistSheet
         isOpen={!!waitlistAirline}
