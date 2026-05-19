@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
+import { getStorage } from 'firebase-admin/storage'
 
 if (!getApps().length) {
   initializeApp({
@@ -10,8 +11,10 @@ if (!getApps().length) {
       // .env stores \n as literal \\n — restore actual newlines
       privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   })
 }
 
-export const adminDb = getFirestore()
-export const adminAuth = getAuth()
+export const adminDb     = getFirestore()
+export const adminAuth   = getAuth()
+export const adminBucket = getStorage().bucket()

@@ -7,8 +7,6 @@ import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera,
 } from 'lucide-react';
-import { storage } from '@/lib/firebase/client';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 /* ── Options ──────────────────────────────────────────────────────────────── */
 const RANKS = [
@@ -118,28 +116,27 @@ export default function SettingsClient() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    if (!file.type.startsWith('image/')) return;
     setUploadingPhoto(true);
+    setError(null);
     try {
-      const storageRef = ref(storage, `avatars/${user.uid}/profile`);
-      await uploadBytes(storageRef, file, { contentType: file.type });
-      const url = await getDownloadURL(storageRef);
-
-      // Persist to Firestore
       const idToken = await user.getIdToken();
-      await fetch('/api/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ avatar_url: url }),
-      });
+      const formData = new FormData();
+      formData.append('file', file);
 
-      setAvatarUrl(url);
-      setProfile({ ...(profile ?? { id: user.uid }), avatar_url: url });
+      const res  = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `Upload failed (${res.status})`);
+
+      setAvatarUrl(json.url);
+      setProfile({ ...(profile ?? { id: user.uid }), avatar_url: json.url });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Photo upload failed.');
     } finally {
       setUploadingPhoto(false);
-      // Reset input so the same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };

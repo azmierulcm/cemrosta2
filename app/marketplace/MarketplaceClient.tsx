@@ -16,9 +16,11 @@ export default function MarketplaceClient() {
   const [sort, setSort] = useState<SortOption>('newest');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchListings = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const results = await getListings({
         category: category || undefined,
@@ -27,6 +29,8 @@ export default function MarketplaceClient() {
         limit: 24,
       });
       setListings(results);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to load listings.');
     } finally {
       setLoading(false);
     }
@@ -67,6 +71,13 @@ export default function MarketplaceClient() {
         onSort={setSort}
         onVerifiedOnly={setVerifiedOnly}
       />
+
+      {/* Error */}
+      {fetchError && (
+        <div className="px-4 py-3 rounded-[var(--radius-md)] bg-danger-soft border border-danger/20 text-[13px] text-danger font-bold">
+          {fetchError}
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? (
