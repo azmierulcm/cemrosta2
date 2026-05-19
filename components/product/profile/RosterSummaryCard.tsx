@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  ZoomableGroup,
-  Line,
-  Marker,
-} from 'react-simple-maps';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import type { EarnedDestination } from '@/lib/actions/destinations';
 import type { RosterSummary } from '@/lib/types/roster';
+
+// Dynamically import react-simple-maps so it doesn't bloat the initial bundle
+const ComposableMap = dynamic(() => import('react-simple-maps').then((m) => m.ComposableMap), { ssr: false });
+const Geographies   = dynamic(() => import('react-simple-maps').then((m) => m.Geographies),   { ssr: false });
+const Geography     = dynamic(() => import('react-simple-maps').then((m) => m.Geography),     { ssr: false });
+const ZoomableGroup = dynamic(() => import('react-simple-maps').then((m) => m.ZoomableGroup), { ssr: false });
+const Line          = dynamic(() => import('react-simple-maps').then((m) => m.Line),          { ssr: false });
+const Marker        = dynamic(() => import('react-simple-maps').then((m) => m.Marker),        { ssr: false });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RosterSummaryCard — visual language matches LiveRosterCard exactly

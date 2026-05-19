@@ -7,15 +7,19 @@ import { RosterProvider } from "@/lib/contexts/RosterContext";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  // Include every weight used in the app (font-bold=700, font-black=900).
+  // Missing weights were previously synthesised by the browser (slow + blurry).
+  weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
+  preload: true,
 });
 
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "700"],
   display: "swap",
+  preload: true,
 });
 
 export const viewport: Viewport = {
@@ -62,6 +66,13 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Preconnect to external origins used at runtime */}
+        <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+        <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+      </head>
       <body className="min-h-full flex flex-col bg-bg text-text selection:bg-accent/30">
         <a 
           href="#main-content" 

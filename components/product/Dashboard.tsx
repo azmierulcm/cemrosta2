@@ -653,7 +653,7 @@ export const Dashboard = () => {
             {/* ── Duty tiles (formerly Timeline) ───────────────────────────── */}
             <div className="order-2 lg:order-1 lg:col-span-8">
               <div className="flex items-center gap-4 mb-6">
-                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster.</h3>
+                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster Details.</h3>
                 <div className="h-px flex-1 bg-border/50" />
                 <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
                   Tap to edit
@@ -669,7 +669,7 @@ export const Dashboard = () => {
             {/* ── Calendar (unchanged) ─────────────────────────────────────── */}
             <div className="order-1 lg:order-2 lg:col-span-4">
               <div className="sticky top-32">
-                <div className="flex items-center gap-4 mb-12">
+                <div className="flex items-center gap-4 mb-6">
                   <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
                   <div className="h-px flex-1 bg-border/50" />
                 </div>

@@ -46,7 +46,9 @@ export default function NewListingPage() {
           {"// NEW LISTING"}
         </p>
         <h1 className="text-3xl font-black tracking-tighter text-text">Post gear for sale</h1>
-        <p className="text-[13px] text-text-muted font-bold mt-1.5">Your listing will be active for 30 days.</p>
+        <p className="text-[13px] text-text-muted font-bold mt-1.5">
+          Listings are automatically removed after <span className="text-text font-black">30 days</span>.
+        </p>
       </div>
 
       {error && (
