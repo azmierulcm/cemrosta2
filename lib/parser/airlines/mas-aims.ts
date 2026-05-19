@@ -1,137 +1,181 @@
-import { ParsedRoster, ParsedDuty, ParsedFlight } from '../types';
+import { ParsedRoster, ParsedDuty, ParsedFlight, ParsedMonthlyStats } from '../types';
 import type { ParseLogger } from '../logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Malaysia Airlines — AIMS Roster Parser
 //
-// Fault-tolerance model:
-//   • Every individual duty is wrapped in its own try-catch.  A single
-//     malformed duty is skipped and logged; the rest of the roster continues.
-//   • Every warning carries: date, character offset, and the raw chunk —
-//     enough context to reproduce the failure from logs alone.
-//   • The logger parameter is optional (backwards-compatible with unit tests).
+// Data extracted per duty row:
+//   date       — ISO YYYY-MM-DD
+//   day        — "MON" | "TUE" … (computed from date, not extracted from PDF)
+//   item       — flight number ("MH001") or duty code ("OFF", "SBY", "SIM")
+//   depPort    — IATA departure port
+//   arrPort    — IATA arrival port
+//   std / sta  — scheduled times (HH:MM)
+//   blockHrs   — "HH:MM" from PDF block-hours column (best-effort, times[2])
+//   dutyHrs    — "HH:MM" from PDF duty-hours column (best-effort, times[3])
+//   signOn     — pre-flight sign-on time
+//   signOff    — post-flight sign-off time
+//   notes      — hotel / layover info if present
 //
-// Bug-fix history (v2):
-//   • flightChunk is now BOUNDED to the next flight match, not the end of the
-//     date block.  This prevents times from flight N+1 polluting flight N.
-//   • Sign-on time is extracted from the pre-flight segment of the day chunk
-//     (it appears BEFORE the first "MH XXXX" token in AIMS layout).
-//   • Roster month/year is derived via MODE of all date matches, not the first
-//     match (which may be a header/validity date from a different month).
-//   • OFF / leave days, TRAINING / SIM duties, and extended standby patterns
-//     (SB, SA, SH, ASB) are now detected and emitted as typed duties.
+// Monthly stats extracted from the PDF summary section:
+//   actualBlockHours — "HH:MM"
+//   dutyHours        — "HH:MM"
+//   offDaysAtBase    — integer
+//
+// Fault-tolerance: every individual duty is wrapped in its own try-catch.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Exclusion list for port-code extraction ───────────────────────────────────
-// Three-letter tokens that appear in AIMS text but are NOT IATA airport codes.
+// ── Exclusion list for port-code extraction ────────────────────────────────────
 const AIMS_NON_PORT = new Set([
-  // Column headers / abbreviations
   'ACT', 'STD', 'STA', 'SGN', 'SFI', 'OBS', 'POS', 'REL', 'DEB', 'ETA', 'ETD',
   'ARR', 'DEP', 'CAB', 'CCR', 'CRT', 'OPT', 'DAY', 'OFF', 'MNT', 'TRN',
-  // Days of week
   'SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT',
-  // Months
   'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
-  // Training / ground codes
   'SIM', 'GND', 'CRM', 'LPC', 'OPC', 'CBT', 'TRG',
-  // Standby codes
   'ASB', 'SBY',
 ]);
 
-// ── Duty-type detection patterns ─────────────────────────────────────────────
-
-/** Day-off / leave patterns */
-const OFF_REGEX = /\b(OFF|REST|AL|SL|ML|HL|PH|EL|CMP|COMP)\b/i;
-
-/** Training / simulator patterns */
+// ── Duty-type detection patterns ───────────────────────────────────────────────
+const OFF_REGEX      = /\b(OFF|REST|AL|SL|ML|HL|PH|EL|CMP|COMP)\b/i;
 const TRAINING_REGEX = /\b(SIM\/TRN|SIM|TRN|GND|LPC|OPC|CRM|TRAINING|CBT|RECURRENT|TRG)\b/i;
+const STANDBY_REGEX  = /\b(SB|SA|SH|ASB|SBY|STBY|S\d+-\d+)\b/gi;
 
-/** Standby patterns — extends the old S\d+-\d+ to cover SB / SA / SH / ASB */
-const STANDBY_REGEX = /\b(SB|SA|SH|ASB|SBY|STBY|S\d+-\d+)\b/gi;
-
-// ── Human-readable labels ─────────────────────────────────────────────────────
-
+// ── Human-readable labels ──────────────────────────────────────────────────────
 const OFF_LABEL: Record<string, string> = {
-  OFF:  'Day Off',
-  REST: 'Rest Day',
-  AL:   'Annual Leave',
-  SL:   'Sick Leave',
-  ML:   'Maternity Leave',
-  HL:   'Home Leave',
-  PH:   'Public Holiday',
-  EL:   'Emergency Leave',
-  CMP:  'Compensatory Off',
+  OFF:  'Day Off',     REST: 'Rest Day',         AL:   'Annual Leave',
+  SL:   'Sick Leave',  ML:   'Maternity Leave',   HL:   'Home Leave',
+  PH:   'Public Holiday', EL: 'Emergency Leave',  CMP:  'Compensatory Off',
   COMP: 'Compensatory Off',
 };
 
 const TRAINING_LABEL: Record<string, string> = {
-  'SIM/TRN': 'Simulator Training',
-  SIM:       'Simulator',
-  TRN:       'Training',
-  GND:       'Ground Training',
-  LPC:       'Line Proficiency Check',
-  OPC:       'Operator Proficiency Check',
-  CRM:       'Crew Resource Management',
-  TRAINING:  'Training',
-  CBT:       'Computer-Based Training',
-  RECURRENT: 'Recurrent Training',
-  TRG:       'Training',
+  'SIM/TRN': 'Simulator Training', SIM: 'Simulator',        TRN: 'Training',
+  GND:       'Ground Training',    LPC: 'Line Proficiency Check',
+  OPC:       'Operator Proficiency Check', CRM: 'Crew Resource Management',
+  TRAINING:  'Training',           CBT: 'Computer-Based Training',
+  RECURRENT: 'Recurrent Training', TRG: 'Training',
 };
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// ── Day-of-week lookup ─────────────────────────────────────────────────────────
+const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
 
+function getDayOfWeek(dateISO: string): string {
+  // Use noon UTC to avoid any DST/timezone boundary issues
+  const d = new Date(`${dateISO}T12:00:00Z`);
+  return DOW[d.getUTCDay()];
+}
+
+// ── HH:MM duration validator ───────────────────────────────────────────────────
+// Block/duty hours are durations — hours can exceed 23. Clock times are 00-23.
+// A value whose hours part is > 23 is definitely a duration, not a clock time.
+// Values 00-23 are ambiguous; we accept them as potential durations here.
+function isHHMM(s: string): boolean {
+  return /^\d{1,3}:\d{2}$/.test(s);
+}
+
+// ── Monthly stats extraction ───────────────────────────────────────────────────
+// AIMS PDFs print a summary section with total block hours, duty hours, and
+// off-day counts. The exact label varies between AIMS versions and airlines;
+// we try several patterns for each field.
+
+function extractMonthlyStats(text: string, logger?: ParseLogger): ParsedMonthlyStats {
+  const stats: ParsedMonthlyStats = {};
+
+  // Actual block hours — matches "ACT BLK HRS 74:25", "ACTUAL BLOCK 74:25",
+  // "BLK HRS : 74:25", "TOTAL BLOCK HRS 74:25"
+  const blkPatterns = [
+    /ACT(?:UAL)?\s+BLK(?:OCK)?\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /BLK(?:OCK)?\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /TOTAL\s+BLOCK(?:\s+HRS?)?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /BLOCK\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+  ];
+  for (const pat of blkPatterns) {
+    const m = text.match(pat);
+    if (m) { stats.actualBlockHours = m[1]; break; }
+  }
+
+  // Duty hours — matches "DUTY HRS 89:10", "DHR : 89:10", "TOTAL DUTY 89:10"
+  const dhrPatterns = [
+    /DUTY\s+HRS?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /DHR\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+    /TOTAL\s+DUTY(?:\s+HRS?)?\s*[:\-]?\s*(\d{1,4}:\d{2})/i,
+  ];
+  for (const pat of dhrPatterns) {
+    const m = text.match(pat);
+    if (m) { stats.dutyHours = m[1]; break; }
+  }
+
+  // Off days — matches "OFF DAYS 8", "OFF DAYS AT BASE 8", "NO OF OFF DAYS 8",
+  // "DAYS OFF : 8"
+  const offPatterns = [
+    /(?:NO\s+OF\s+)?OFF\s+DAYS?\s+(?:AT\s+BASE\s+)?[:\-]?\s*(\d{1,2})/i,
+    /DAYS?\s+OFF\s*[:\-]?\s*(\d{1,2})/i,
+  ];
+  for (const pat of offPatterns) {
+    const m = text.match(pat);
+    if (m) { stats.offDaysAtBase = parseInt(m[1], 10); break; }
+  }
+
+  logger?.info('mas-aims:monthly-stats', 'Monthly stats extraction result', {
+    actualBlockHours: stats.actualBlockHours ?? null,
+    dutyHours:        stats.dutyHours ?? null,
+    offDaysAtBase:    stats.offDaysAtBase ?? null,
+  });
+
+  return stats;
+}
+
+// ── Port extraction ────────────────────────────────────────────────────────────
 function extractPorts(flightChunk: string): [string, string] {
-  // Primary: the two airports immediately after the flight number
   const direct = flightChunk.match(/MH\s*\d+\s+([A-Z]{3})\s+([A-Z]{3})/);
   if (direct) return [direct[1], direct[2]];
-
-  // Fallback: any 3-letter token not in the exclusion list
   const filtered = (flightChunk.match(/\b[A-Z]{3}\b/g) ?? []).filter(
     (p) => !AIMS_NON_PORT.has(p),
   );
   return [filtered[0] ?? '', filtered[1] ?? ''];
 }
 
+// ── Month map ──────────────────────────────────────────────────────────────────
 const MONTH_MAP: Record<string, string> = {
   JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
   JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12',
 };
 
-/**
- * Return the roster's canonical month + year by taking the MODE of all parsed
- * date matches.  A monthly roster will have ~20-31 entries for the same month;
- * any stray header/validity date from a different month will be a minority.
- */
-function inferRosterPeriod(
-  dateMatches: RegExpMatchArray[],
-): { month: string; year: string } {
+// ── Roster period via MODE of all date matches ─────────────────────────────────
+function inferRosterPeriod(dateMatches: RegExpMatchArray[]): { month: string; year: string } {
   const counts = new Map<string, number>();
   for (const m of dateMatches) {
     const key = `${m[2].toUpperCase()}-${m[3]}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-
   let best = `${dateMatches[0][2].toUpperCase()}-${dateMatches[0][3]}`;
   let bestCount = 0;
   for (const [key, count] of counts) {
-    if (count > bestCount) {
-      bestCount = count;
-      best = key;
-    }
+    if (count > bestCount) { bestCount = count; best = key; }
   }
-
   const [month, year] = best.split('-') as [string, string];
   return { month, year };
 }
 
-// ── Main parser ───────────────────────────────────────────────────────────────
+// ── Hotel / layover note extraction ───────────────────────────────────────────
+// AIMS sometimes appends hotel or layover city text after flight times.
+// Look for a capitalised word sequence that follows the time block.
+function extractNotes(chunk: string): string | undefined {
+  // Match text like "LAYOVER LHR" or "HOTEL SHERATON" after the times
+  const m = chunk.match(/\b(LAYOVER|HOTEL|OVERNIGHT)\b[:\s]+([A-Z][A-Z0-9\s]{1,40})/i);
+  return m ? m[0].trim() : undefined;
+}
 
+// ── Main parser ────────────────────────────────────────────────────────────────
 export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
   const duties: ParsedDuty[] = [];
   let skippedDuties = 0;
 
+  // ── Monthly stats (from PDF summary section) ───────────────────────────────
+  const monthlyStats = extractMonthlyStats(text, logger);
+
   // ── Date blocks ────────────────────────────────────────────────────────────
-  const dateRegex = /(\d{2})-([A-Z]{3})-(\d{4})/gi;
+  const dateRegex   = /(\d{2})-([A-Z]{3})-(\d{4})/gi;
   const dateMatches = Array.from(text.matchAll(dateRegex));
 
   if (dateMatches.length === 0) {
@@ -146,12 +190,12 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
 
   logger?.info('mas-aims:dates', `Found ${dateMatches.length} date block(s)`, {
     firstDate: dateMatches[0][0],
-    lastDate: dateMatches[dateMatches.length - 1][0],
+    lastDate:  dateMatches[dateMatches.length - 1][0],
   });
 
   // ── Crew name ──────────────────────────────────────────────────────────────
   const crewNameMatch = text.match(/Name:\s*([A-Z][A-Z\s]+)/i);
-  const crewName = crewNameMatch ? crewNameMatch[1].trim() : 'Crew Member';
+  const crewName      = crewNameMatch ? crewNameMatch[1].trim() : 'Crew Member';
 
   if (!crewNameMatch) {
     logger?.warn('mas-aims:crew', 'Could not find "Name:" field — defaulting to "Crew Member"', {
@@ -161,48 +205,37 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
     logger?.info('mas-aims:crew', `Crew name extracted: ${crewName}`);
   }
 
-  // ── Roster period — MODE of all date matches (bug fix: was first match) ────
+  // ── Roster period ──────────────────────────────────────────────────────────
   const { month: rosterMonth, year: rosterYear } = inferRosterPeriod(dateMatches);
-
-  logger?.info('mas-aims:period', `Roster period: ${rosterMonth} ${rosterYear}`, {
-    totalDateMatches: dateMatches.length,
-    inferredViaMode: true,
-  });
+  logger?.info('mas-aims:period', `Roster period: ${rosterMonth} ${rosterYear}`);
 
   // ── Per-date-block parsing ─────────────────────────────────────────────────
   for (let i = 0; i < dateMatches.length; i++) {
     const match      = dateMatches[i];
-    const day        = match[1];
+    const dayNum     = match[1];
     const monthStr   = match[2].toUpperCase();
     const year       = match[3];
-    const dateISO    = `${year}-${MONTH_MAP[monthStr] ?? '01'}-${day}`;
+    const dateISO    = `${year}-${MONTH_MAP[monthStr] ?? '01'}-${dayNum}`;
     const charOffset = match.index!;
+    const dayOfWeek  = getDayOfWeek(dateISO);
 
     const chunkStart = charOffset + match[0].length;
     const chunkEnd   = dateMatches[i + 1] ? dateMatches[i + 1].index! : text.length;
     const chunk      = text.substring(chunkStart, chunkEnd);
 
-    // All times in the chunk — fallback for duties without bounded sub-chunks
     const chunkTimes = chunk.match(/\d{2}:\d{2}/g) ?? [];
 
-    // ── Flight extraction ──────────────────────────────────────────────────
-    const flightRegex = /MH\s*(\d+)/gi;
+    // ── Flight extraction ────────────────────────────────────────────────────
+    const flightRegex   = /MH\s*(\d+)/gi;
     const flightMatches = Array.from(chunk.matchAll(flightRegex));
 
-    // ── Day-level sign-on: last HH:MM BEFORE the first "MH XXXX" token ───
-    // In AIMS layout the sign-on time (SGN) appears before the first flight
-    // number on the same duty line.  We must NOT search inside the flight
-    // chunk itself — that chunk begins at the "MH" token and only contains
-    // STD, STA, and (for the last leg) sign-off times.
+    // Sign-on: last HH:MM before the first "MH XXXX" token
     const firstFlightOffset = flightMatches[0]?.index ?? chunk.length;
     const preFlightTimes    = chunk.substring(0, firstFlightOffset).match(/\d{2}:\d{2}/g) ?? [];
-    const daySignOn         = preFlightTimes.at(-1); // last time before first MH = SGN
+    const daySignOn         = preFlightTimes.at(-1);
 
     flightMatches.forEach((fMatch, fIdx) => {
       try {
-        // ── Bounded flight chunk (bug fix: was open-ended to end of date block)
-        // By bounding to the NEXT flight match we prevent time tokens from
-        // subsequent flights polluting STD/STA extraction for this flight.
         const flightEnd   = fIdx + 1 < flightMatches.length
           ? flightMatches[fIdx + 1].index!
           : chunk.length;
@@ -215,8 +248,14 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
         const isFirst = fIdx === 0;
         const isLast  = fIdx === flightMatches.length - 1;
 
-        // times[0] = STD, times[1] = STA
-        // For the LAST leg, times[2] may be sign-off (SFI) if present in chunk
+        // times[0]=STD  times[1]=STA  times[2]=blockHrs (best-effort)
+        // times[3]=dutyHrs (best-effort, only present when AIMS prints per-leg duty)
+        // For the last leg, times[2] may alternatively be the sign-off time.
+        // We capture both possibilities: use times[2] as blockHrs and also
+        // as signOff (they often have the same index in different AIMS versions).
+        const blockHrs = times[2] && isHHMM(times[2]) ? times[2] : undefined;
+        const dutyHrs  = times[3] && isHHMM(times[3]) ? times[3] : undefined;
+
         const flight: ParsedFlight = {
           flightNumber: `MH${flightNo}`,
           depPort,
@@ -229,28 +268,29 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
 
         if (!depPort || !arrPort) {
           logger?.warn('mas-aims:flight', `Missing port code(s) on MH${flightNo}`, {
-            date:      dateISO,
-            charOffset: charOffset + fMatch.index!,
-            depPort:   depPort || null,
-            arrPort:   arrPort || null,
-            rawChunk:  flightChunk.slice(0, 120),
+            date: dateISO, charOffset: charOffset + fMatch.index!,
+            depPort: depPort || null, arrPort: arrPort || null,
+            rawChunk: flightChunk.slice(0, 120),
           });
         }
 
         if (times.length < 2) {
           logger?.warn('mas-aims:flight', `Insufficient time fields on MH${flightNo}`, {
-            date:       dateISO,
-            charOffset: charOffset + fMatch.index!,
-            timesFound: times.length,
-            rawChunk:   flightChunk.slice(0, 120),
+            date: dateISO, charOffset: charOffset + fMatch.index!,
+            timesFound: times.length, rawChunk: flightChunk.slice(0, 120),
           });
         }
 
         duties.push({
-          id:    `MH${flightNo}-${dateISO}-${fIdx}`,
-          type:  'FLIGHT',
-          date:  dateISO,
+          id:      `MH${flightNo}-${dateISO}-${fIdx}`,
+          type:    'FLIGHT',
+          date:    dateISO,
+          day:     dayOfWeek,
+          item:    `MH${flightNo}`,
           flight,
+          blockHrs,
+          dutyHrs,
+          notes:   extractNotes(flightChunk),
           ...(isFirst && daySignOn ? { signOn:  daySignOn } : {}),
           ...(isLast  && times[2]  ? { signOff: times[2]  } : {}),
         });
@@ -258,20 +298,16 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
       } catch (err: unknown) {
         skippedDuties++;
         logger?.error('mas-aims:flight', `Unexpected error parsing flight in date block ${dateISO}`, {
-          date:        dateISO,
-          charOffset,
-          flightIndex: fIdx,
-          error:       err instanceof Error ? err.message : String(err),
-          rawChunk:    chunk.slice(0, 200),
+          date: dateISO, charOffset, flightIndex: fIdx,
+          error: err instanceof Error ? err.message : String(err),
+          rawChunk: chunk.slice(0, 200),
         });
-        // Continue to next flight — never rethrow inside a per-duty block
       }
     });
 
-    // ── Non-flight duties — only checked when no flights found for this day ──
+    // ── Non-flight duties ────────────────────────────────────────────────────
     if (flightMatches.length === 0) {
 
-      // ── OFF / leave day ──────────────────────────────────────────────────
       const offMatch = chunk.match(OFF_REGEX);
       if (offMatch) {
         try {
@@ -280,18 +316,18 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
             id:          `${code}-${dateISO}`,
             type:        'OFF',
             date:        dateISO,
+            day:         dayOfWeek,
+            item:        code,
             description: OFF_LABEL[code] ?? `Off — ${code}`,
           });
         } catch (err: unknown) {
           skippedDuties++;
           logger?.error('mas-aims:off', `Error parsing OFF duty at ${dateISO}`, {
-            date: dateISO,
-            error: err instanceof Error ? err.message : String(err),
+            date: dateISO, error: err instanceof Error ? err.message : String(err),
           });
         }
       }
 
-      // ── Training / simulator ─────────────────────────────────────────────
       const trainingMatch = !offMatch ? chunk.match(TRAINING_REGEX) : null;
       if (trainingMatch) {
         try {
@@ -300,6 +336,8 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
             id:          `${code}-${dateISO}`,
             type:        'TRAINING',
             date:        dateISO,
+            day:         dayOfWeek,
+            item:        code,
             signOn:      chunkTimes[0] ?? undefined,
             signOff:     chunkTimes[chunkTimes.length - 1] ?? undefined,
             description: TRAINING_LABEL[code] ?? `Training — ${code}`,
@@ -307,13 +345,11 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
         } catch (err: unknown) {
           skippedDuties++;
           logger?.error('mas-aims:training', `Error parsing TRAINING duty at ${dateISO}`, {
-            date: dateISO,
-            error: err instanceof Error ? err.message : String(err),
+            date: dateISO, error: err instanceof Error ? err.message : String(err),
           });
         }
       }
 
-      // ── Standby (no flights) — extended pattern: S\d+, SB, SA, SH, ASB ──
       if (!offMatch && !trainingMatch) {
         const standbyMatches = Array.from(chunk.matchAll(STANDBY_REGEX));
         standbyMatches.forEach((sMatch) => {
@@ -324,8 +360,7 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
 
             if (sTimes.length === 0) {
               logger?.warn('mas-aims:standby', `No times found for standby ${code}`, {
-                date: dateISO, charOffset: charOffset + sMatch.index!,
-                rawChunk: sChunk.slice(0, 120),
+                date: dateISO, charOffset: charOffset + sMatch.index!, rawChunk: sChunk.slice(0, 120),
               });
             }
 
@@ -333,6 +368,8 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
               id:          `${code}-${dateISO}`,
               type:        'STANDBY',
               date:        dateISO,
+              day:         dayOfWeek,
+              item:        code,
               signOn:      sTimes[0] ?? undefined,
               signOff:     sTimes.at(-1) ?? undefined,
               description: `Standby — ${code}`,
@@ -340,15 +377,14 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
           } catch (err: unknown) {
             skippedDuties++;
             logger?.error('mas-aims:standby', `Error parsing standby at ${dateISO}`, {
-              date: dateISO, charOffset,
-              error: err instanceof Error ? err.message : String(err),
+              date: dateISO, charOffset, error: err instanceof Error ? err.message : String(err),
             });
           }
         });
       }
+
     } else {
-      // Flights were found — also check for any mixed-day standby codes that
-      // appear alongside flights (e.g. ground standby after a short turn)
+      // Mixed-day standby alongside flights
       const standbyMatches = Array.from(chunk.matchAll(STANDBY_REGEX));
       standbyMatches.forEach((sMatch) => {
         try {
@@ -360,6 +396,8 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
             id:          `${code}-${dateISO}-SBY`,
             type:        'STANDBY',
             date:        dateISO,
+            day:         dayOfWeek,
+            item:        code,
             signOn:      sTimes[0] ?? undefined,
             signOff:     sTimes.at(-1) ?? undefined,
             description: `Standby — ${code}`,
@@ -367,8 +405,7 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
         } catch (err: unknown) {
           skippedDuties++;
           logger?.error('mas-aims:standby', `Error parsing mixed-day standby at ${dateISO}`, {
-            date: dateISO, charOffset,
-            error: err instanceof Error ? err.message : String(err),
+            date: dateISO, charOffset, error: err instanceof Error ? err.message : String(err),
           });
         }
       });
@@ -377,8 +414,7 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
 
   if (skippedDuties > 0) {
     logger?.warn('mas-aims', `${skippedDuties} duty/duties skipped due to parse errors`, {
-      skippedDuties,
-      totalExtracted: duties.length,
+      skippedDuties, totalExtracted: duties.length,
     });
   }
 
@@ -389,6 +425,7 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
     offDays:         duties.filter((d) => d.type === 'OFF').length,
     training:        duties.filter((d) => d.type === 'TRAINING').length,
     skippedDuties,
+    monthlyStats,
   });
 
   return {
@@ -397,5 +434,6 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
     year:    rosterYear,
     airline: 'Malaysia Airlines',
     duties,
+    monthlyStats,
   };
 }

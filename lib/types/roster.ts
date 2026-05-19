@@ -1,4 +1,4 @@
-import type { DutyEvent } from './index';
+import type { DutyEvent, MonthlyStats } from './index';
 
 export interface RosterSummary {
   id: string;
@@ -13,6 +13,7 @@ export interface RosterSummary {
   totalBlockMinutes: number;
   uniqueDestinations: number;
   parserVersion?: string;
+  monthlyStats?: MonthlyStats;
 }
 
 export interface FirestoreRoster extends RosterSummary {

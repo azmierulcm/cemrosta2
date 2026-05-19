@@ -58,6 +58,7 @@ export interface EnrichedDuty extends Omit<ParsedDuty, 'flight'> {
    * crew is away overnight.  Always false for non-flight duties.
    */
   isLayover: boolean;
+  // blockHrs, dutyHrs, day, item, notes are inherited from ParsedDuty via Omit
 }
 
 export interface EnrichedRoster {
@@ -68,8 +69,10 @@ export interface EnrichedRoster {
   /** Home base IATA — inferred from the most frequent departure port. */
   inferredBase: string;
   duties: EnrichedDuty[];
+  /** Monthly stats read directly from the PDF summary section. */
+  monthlyStats?: import('./types').ParsedMonthlyStats;
 
-  // ── Aggregate stats ──────────────────────────────────────────────────────
+  // ── Aggregate stats (computed — used as fallback when monthlyStats absent) ─
   totalBlockMinutes: number;
   totalDutyMinutes: number;
   totalKm: number;
@@ -285,6 +288,7 @@ export function enrichParsedRoster(parsed: ParsedRoster): EnrichedRoster {
     airline:          parsed.airline,
     inferredBase:     base,
     duties:           enrichedDuties,
+    monthlyStats:     parsed.monthlyStats,
     totalBlockMinutes,
     totalDutyMinutes,
     totalKm,

@@ -219,6 +219,8 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
       id:           d.id,
       type:         d.type as DutyEvent['type'],
       date:         d.date,
+      day:          d.day,
+      item:         d.item,
       flightNumber: d.flight?.flightNumber,
       depPort:      d.flight?.depPort,
       arrPort:      d.flight?.arrPort,
@@ -226,8 +228,11 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
       sta:          d.flight?.sta,
       signOn:       d.signOn ?? d.flight?.signOn,
       signOff:      d.signOff ?? d.flight?.signOff,
+      blockHrs:     d.blockHrs,
+      dutyHrs:      d.dutyHrs,
       hotel:        d.flight?.hotel,
       description:  d.description,
+      notes:        d.notes,
     }),
   );
 
@@ -238,6 +243,7 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
     crewName:          parsed.crewName,
     airline:           airlineNameToIata(parsed.airline),
     totalBlockMinutes: enriched.totalBlockMinutes,
+    monthlyStats:      enriched.monthlyStats,
     parseReport:       report,
   };
 }

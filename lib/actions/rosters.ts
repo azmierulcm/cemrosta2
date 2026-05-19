@@ -114,6 +114,7 @@ export async function saveRoster(
     totalBlockMinutes,
     uniqueDestinations,
     parserVersion:     PARSER_VERSION,
+    ...(rosterData.monthlyStats ? { monthlyStats: rosterData.monthlyStats } : {}),
     ...(icsContent ? { icsContent } : {}),
   });
 
@@ -146,6 +147,7 @@ export async function getUserRosters(userId: string): Promise<RosterSummary[]> {
         totalBlockMinutes: d.totalBlockMinutes ?? 0,
         uniqueDestinations: d.uniqueDestinations ?? 0,
         parserVersion:     d.parserVersion ?? undefined,
+        monthlyStats:      d.monthlyStats ?? undefined,
       } satisfies RosterSummary;
     })
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)); // newest first
