@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/shared/Navbar';
 import { LandingHero } from '@/components/marketing/LandingHero';
@@ -47,6 +47,9 @@ const Dashboard = dynamic(
 );
 const FileUploader = dynamic(
   () => import('@/components/product/FileUploader').then(m => ({ default: m.FileUploader })),
+);
+const OnboardingFlow = dynamic(
+  () => import('@/components/product/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })),
 );
 
 // ── Loading states ─────────────────────────────────────────────────────────────
@@ -101,6 +104,17 @@ export default function HomeClient() {
   const { activeRoster, isLoading: isRosterLoading, isLoadingList } = useRoster();
   const { user, isLoading: isAuthLoading } = useAuth();
 
+  // Track whether this user has already been through the onboarding wizard.
+  // Default to showing the full wizard (best experience for first-timers);
+  // the effect below flips it to false if localStorage says they've seen it.
+  const [showOnboarding, setShowOnboarding] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const seen = localStorage.getItem(`cemrosta-ob-${user.uid}`) === '1';
+    if (seen) setShowOnboarding(false);
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Wait for both the roster list AND the active roster fetch before showing content.
   // Without isRosterLoading, the upload prompt flashes between isLoadingList→false
   // and selectRoster completing, making the app appear stuck on refresh.
@@ -140,8 +154,16 @@ export default function HomeClient() {
               <Footer />
             </motion.div>
           ) : !activeRoster ? (
-            /* ── Logged in, no roster → upload prompt ─────────────────────── */
-            <UploadPrompt key="onboarding" />
+            /* ── Logged in, no roster → onboarding wizard (first visit) or
+               plain upload prompt (returning user) ─────────────────────────*/
+            showOnboarding ? (
+              <OnboardingFlow
+                key="onboarding"
+                onComplete={() => setShowOnboarding(false)}
+              />
+            ) : (
+              <UploadPrompt key="upload-prompt" />
+            )
           ) : (
             /* ── Has a roster → dashboard ─────────────────────────────────── */
             <motion.div
