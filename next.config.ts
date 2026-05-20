@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
@@ -58,14 +60,11 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
           // Lock down browser feature access
           { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
-          // Content-Security-Policy
-          // 'unsafe-inline' is required for Tailwind CSS-in-JS and Next.js hydration scripts.
-          // 'unsafe-eval' is required in development by Next.js hot-reload.
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://storage.googleapis.com https://lh3.googleusercontent.com",
               "font-src 'self' https://fonts.gstatic.com",

@@ -32,7 +32,6 @@ export default function AdminClient() {
   const [tab, setTab] = useState<Tab>('overview');
 
   const isAdmin = !isLoading && !!user?.email && ADMIN_EMAILS.includes(user.email);
-  console.log('[admin] user.email:', user?.email, '| isLoading:', isLoading, '| isAdmin:', isAdmin);
 
   useEffect(() => {
     if (!isLoading && !isAdmin) router.replace('/');
