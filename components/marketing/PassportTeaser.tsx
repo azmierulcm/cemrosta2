@@ -105,7 +105,7 @@ export function PassportTeaser() {
             <Sparkles size={12} className="text-accent" />
             Digital Passport
           </div>
-          <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-text leading-[0.95]">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-text leading-[0.95]">
             Every flight.<br />
             <span className="text-accent">Every city. Collected.</span>
           </h2>
@@ -186,7 +186,7 @@ export function PassportTeaser() {
             onClick={() => openAuthModal('signup')}
             className="inline-flex items-center gap-3 px-10 py-5 rounded-full bg-accent text-accent-fg text-lg font-black shadow-2xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
           >
-            Start building your passport
+            Upload my roster — it&apos;s free
             <ArrowRight size={20} strokeWidth={3} />
           </button>
           <p className="text-[13px] text-text-subtle font-bold">

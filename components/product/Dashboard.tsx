@@ -477,8 +477,8 @@ export const Dashboard = () => {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-start justify-between mb-16 gap-8">
         <div>
-          <div className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono">
-            <MapPin size={12} className="text-accent" />
+          <div className="flex items-center gap-2 mb-4 text-[12px] font-black uppercase tracking-[0.3em] text-text-muted font-mono">
+            <MapPin size={14} className="text-accent" />
             Mission Control
           </div>
           <h2 className="text-5xl md:text-7xl font-bold tracking-tighter text-text">
@@ -674,7 +674,7 @@ export const Dashboard = () => {
                   <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
                   <div className="h-px flex-1 bg-border/50" />
                 </div>
-                <DutyCalendar />
+                <DutyCalendar onExport={handleExport} />
 
                 <SupportWidget
                   userId={user?.uid}

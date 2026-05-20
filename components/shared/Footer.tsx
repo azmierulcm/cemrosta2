@@ -6,11 +6,11 @@ import { X, Camera, Mail } from 'lucide-react';
 
 export const Footer = () => {
   return (
-    <footer className="bg-white border-t border-border pt-32 pb-16 px-4">
+    <footer className="bg-white border-t border-border pt-14 md:pt-32 pb-10 md:pb-16 px-4">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-16 mb-24">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-16 mb-12 md:mb-24">
           {/* Brand */}
-          <div className="md:col-span-1">
+          <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-8">
               <div className="flex flex-col gap-1">
                 <div className="w-5 h-1 bg-accent/20" />
@@ -24,16 +24,19 @@ export const Footer = () => {
               Own your flight data.
             </p>
             <div className="flex gap-3">
-              <Link href="#" aria-label="Follow Cemrosta on X (Twitter)" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
+              <a href="https://x.com/cemrosta" target="_blank" rel="noopener noreferrer" aria-label="Follow Cemrosta on X (Twitter)" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
                 <X size={18} aria-hidden="true" />
-              </Link>
-              <Link href="#" aria-label="Follow Cemrosta on Instagram" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
+              </a>
+              <a href="https://instagram.com/cemrosta" target="_blank" rel="noopener noreferrer" aria-label="Follow Cemrosta on Instagram" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
                 <Camera size={18} aria-hidden="true" />
-              </Link>
+              </a>
               <a href="mailto:hello@cemrosta.com" aria-label="Email Cemrosta at hello@cemrosta.com" className="w-10 h-10 bg-surface-2 border border-border rounded-full flex items-center justify-center text-text-muted hover:text-accent transition-all hover:shadow-sm">
                 <Mail size={18} aria-hidden="true" />
               </a>
             </div>
+            <a href="mailto:hello@cemrosta.com" className="mt-4 inline-block text-[12px] font-bold text-text-muted hover:text-accent transition-colors">
+              hello@cemrosta.com
+            </a>
           </div>
 
           {/* Product */}
@@ -41,7 +44,11 @@ export const Footer = () => {
             <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle mb-8 font-mono">{"// PRODUCT"}</h4>
             <ul className="space-y-4">
               <li><Link href="/profile" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Digital Passport</Link></li>
-              <li><Link href="/marketplace" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Marketplace</Link></li>
+              <li>
+                <Link href="/marketplace" className="text-sm font-bold text-text-muted hover:text-text transition-colors">
+                  Marketplace <span className="text-[11px] font-black text-text-subtle opacity-60">(coming soon)</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -78,9 +85,11 @@ export const Footer = () => {
           <p className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono">
             © 2026 Cemrosta • All Flights Reserved
           </p>
-          <div className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono bg-surface-2 px-4 py-1 rounded-full border border-border">
-            BUILD 26.05.15
-          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-[10px] font-black text-text-subtle uppercase tracking-[0.4em] font-mono bg-surface-2 px-4 py-1 rounded-full border border-border">
+              BUILD 26.05.15
+            </div>
+          )}
         </div>
       </div>
     </footer>

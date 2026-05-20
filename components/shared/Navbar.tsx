@@ -28,7 +28,7 @@ export const Navbar = () => {
   ]
 
   return (
-    <nav className="sticky top-0 w-full bg-bg border-b border-border z-[100]" style={{ borderBottomWidth: '0.5px' }}>
+    <nav className="sticky top-0 w-full bg-bg/90 backdrop-blur-sm border-b border-border z-[100]" style={{ borderBottomWidth: '0.5px' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
 
@@ -80,9 +80,9 @@ export const Navbar = () => {
                 </button>
                 <button
                   onClick={() => openAuthModal('signup')}
-                  className="flex items-center gap-2 px-5 py-2 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[14px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
+                  className="flex items-center gap-2 px-5 py-2 rounded-[var(--radius-pill)] bg-accent text-accent-fg text-[13px] font-bold hover:bg-accent-hover transition-colors shadow-[var(--shadow-sm)]"
                 >
-                  Register
+                  Upload my roster — it&apos;s free
                 </button>
               </>
             )}
@@ -140,9 +140,9 @@ export const Navbar = () => {
               <>
                 <button
                   onClick={() => { openAuthModal('signup'); setIsMobileMenuOpen(false); }}
-                  className="flex items-center gap-3 w-full px-4 py-3 bg-accent text-accent-fg rounded-[var(--radius-lg)] text-[15px] font-medium"
+                  className="flex items-center gap-3 w-full px-4 py-3 bg-accent text-accent-fg rounded-[var(--radius-lg)] text-[15px] font-bold"
                 >
-                  Register
+                  Upload my roster — it&apos;s free
                 </button>
                 <button
                   onClick={() => { openAuthModal('login'); setIsMobileMenuOpen(false) }}

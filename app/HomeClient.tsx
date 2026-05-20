@@ -5,9 +5,12 @@ import { Navbar } from '@/components/shared/Navbar';
 import { LandingHero } from '@/components/marketing/LandingHero';
 import { ComparisonSection } from '@/components/marketing/ComparisonSection';
 import { HowItWorks } from '@/components/marketing/HowItWorks';
-import { PassportTeaser } from '@/components/marketing/PassportTeaser';
+import { PassportDemoSection } from '@/components/marketing/PassportDemoSection';
 import { AudienceSection } from '@/components/marketing/AudienceSection';
 import { WaitlistSection } from '@/components/marketing/WaitlistSection';
+import { SocialProof } from '@/components/marketing/SocialProof';
+import { DataPrivacy } from '@/components/marketing/DataPrivacy';
+import { FAQ } from '@/components/marketing/FAQ';
 import { PricingCTA } from '@/components/marketing/PricingCTA';
 import { Dashboard } from '@/components/product/Dashboard';
 import { FileUploader } from '@/components/product/FileUploader';
@@ -86,11 +89,13 @@ export default function HomeClient() {
               exit={{ opacity: 0, y: -20 }}
             >
               <LandingHero />
-              <ComparisonSection />
               <HowItWorks />
-              <PassportTeaser />
               <AudienceSection />
+              <ComparisonSection />
+              <PassportDemoSection />
               <WaitlistSection />
+              <FAQ />
+              <SocialProof />
               <PricingCTA />
               <Footer />
             </motion.div>

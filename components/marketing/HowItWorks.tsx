@@ -142,14 +142,14 @@ const STEPS = [
 
 export const HowItWorks = () => {
   return (
-    <section className="py-32 px-4 bg-surface-2">
+    <section className="py-10 md:py-16 px-4 bg-surface-2">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-20">
-          <div className="flex items-center gap-2 mb-5 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono">
+        <div className="mb-10 md:mb-20">
+          <div className="flex items-center gap-2 mb-5 text-[11px] font-black uppercase tracking-[0.35em] text-text-muted font-mono">
             {'// HOW IT WORKS'}
           </div>
-          <h2 className="text-5xl md:text-7xl font-black tracking-tighter text-text leading-none">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-text leading-none">
             Three steps.<br />
             <span className="text-accent">Ready in seconds.</span>
           </h2>

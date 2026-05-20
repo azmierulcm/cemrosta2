@@ -65,7 +65,7 @@ function Footer() {
           color: SUBTLE,
         }}
       >
-        cemrosta.vercel.app
+        cemrosta.io
       </span>
     </div>
   )
@@ -205,17 +205,17 @@ function HomeOG() {
         >
           <div
             style={{
-              fontSize: 74,
+              fontSize: 68,
               fontWeight: 600,
               color: TEXT,
               letterSpacing: '-0.02em',
-              lineHeight: 1.1,
+              lineHeight: 1.05,
               display: 'flex',
               flexDirection: 'column',
             }}
           >
-            <span>Your roster,</span>
-            <span>transformed.</span>
+            <span>Today,</span>
+            <span>we negotiate.</span>
           </div>
           <div
             style={{
@@ -226,7 +226,7 @@ function HomeOG() {
               lineHeight: 1.45,
             }}
           >
-            Built for crew, by crew
+            Drop your PDF. Own your career.
           </div>
         </div>
       </div>

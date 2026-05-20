@@ -2,16 +2,36 @@
 
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Heart } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Heart, Clock } from 'lucide-react';
 import { WaitlistSheet } from './WaitlistSheet';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
-// ── Real patch images for the hero preview ────────────────────────────────────
-const HERO_PATCHES = [
-  { src: '/images/city_patches/kuala_lumpur_patch.png', city: 'Kuala Lumpur', iata: 'KUL' },
-  { src: '/images/city_patches/london_patch.png',       city: 'London',       iata: 'LHR' },
-  { src: '/images/city_patches/singapore_patch.png',    city: 'Singapore',    iata: 'SIN' },
-  { src: '/images/city_patches/hong_kong_patch.png',    city: 'Hong Kong',    iata: 'HKG' },
+// ── Calendar data ─────────────────────────────────────────────────────────────
+const HERO_CALENDAR: Record<number, 'flight' | 'standby' | 'rest'> = {
+   4: 'flight',  5: 'flight',
+   7: 'flight',  8: 'rest',   9: 'flight',
+  12: 'standby',
+  14: 'flight', 15: 'rest',  16: 'rest',  17: 'flight',
+  21: 'flight', 22: 'rest',  23: 'flight',
+  27: 'standby', 28: 'flight', 29: 'rest', 30: 'flight',
+};
+
+const HERO_CELLS: Array<number | null> = [
+  null, null, null, null, 1, 2, 3,
+  4, 5, 6, 7, 8, 9, 10,
+  11, 12, 13, 14, 15, 16, 17,
+  18, 19, 20, 21, 22, 23, 24,
+  25, 26, 27, 28, 29, 30, 31,
+];
+
+// ── Passport patches ──────────────────────────────────────────────────────────
+const PASSPORT_PATCHES = [
+  { src: '/images/city_patches/kuala_lumpur_patch.png', iata: 'KUL' },
+  { src: '/images/city_patches/london_patch.png',       iata: 'LHR' },
+  { src: '/images/city_patches/singapore_patch.png',    iata: 'SIN' },
+  { src: '/images/city_patches/hong_kong_patch.png',    iata: 'HKG' },
+  { src: '/images/city_patches/sydney_patch.png',       iata: 'SYD' },
+  { src: '/images/city_patches/paris_patch.png',        iata: 'CDG' },
 ];
 
 const FORMAT_PILLS = [
@@ -21,177 +41,156 @@ const FORMAT_PILLS = [
   { name: 'SIA',      status: 'soon' },
 ];
 
-// ── Mini roster tile ──────────────────────────────────────────────────────────
-function MiniTile({
-  date, status, from, to, flightNo, time, type,
-}: {
-  date: string; status: string; from: string; to: string;
-  flightNo: string; time: string; type: 'flight' | 'off' | 'standby';
-}) {
-  const band = type === 'flight'  ? 'bg-sky-50 text-sky-700'
-             : type === 'standby' ? 'bg-yellow-50 text-yellow-800'
-             :                      'bg-green-50 text-green-700';
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-sm text-[11px]">
-      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 ${band}`}>
-        <span className="font-bold text-[13px] tabular-nums">{date}</span>
-        <span className="font-bold uppercase tracking-wide text-[9px]">{status}</span>
-      </div>
-      {type === 'flight' ? (
-        <>
-          <div className="flex items-center justify-between px-2.5 py-1">
-            <span className="font-semibold text-neutral-700">{from}</span>
-            <span className="font-bold text-green-700 text-[10px]">{flightNo}</span>
-            <span className="font-semibold text-neutral-700">{to}</span>
-          </div>
-          <div className="flex items-center justify-between px-2.5 pb-1.5 text-neutral-500">
-            <span>{time}</span>
-          </div>
-        </>
-      ) : (
-        <div className="px-2.5 py-2 text-center text-neutral-400 font-medium uppercase tracking-wider text-[9px]">
-          {status}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Mini LiveRosterCard ───────────────────────────────────────────────────────
-function MiniRosterCard() {
-  return (
-    <div
-      className="w-[120px] rounded-[16px] overflow-hidden flex flex-col shadow-2xl shadow-black/20"
-      style={{ background: '#FFFCF8', border: '1px solid rgba(0,0,0,0.06)' }}
-    >
-      {/* Glow */}
-      <div className="relative p-2.5 flex flex-col gap-1.5" style={{ minHeight: 190 }}>
-        <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl"
-             style={{ background: '#FF385C', opacity: 0.12 }} />
-        {/* Header */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[7px] font-bold shrink-0"
-               style={{ background: 'linear-gradient(135deg,#FF385C,#E61E4D)' }}>
-            AC
-          </div>
-          <div>
-            <div className="text-[7px] font-bold text-[#222] leading-none">Ahmad Crew</div>
-            <div className="text-[6px] text-[#717171] leading-none mt-0.5">Captain · A350</div>
-          </div>
-        </div>
-        {/* Eyebrow */}
-        <div className="text-[6px] font-black uppercase tracking-widest mt-1"
-             style={{ color: '#FF385C' }}>
-          Stamps collected
-        </div>
-        {/* 2 patch images */}
-        <div className="grid grid-cols-2 gap-1">
-          {[
-            '/images/city_patches/london_patch.png',
-            '/images/city_patches/paris_patch.png',
-          ].map((src, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={src} alt="" className="w-full aspect-square object-contain" />
-          ))}
-        </div>
-        {/* Stats */}
-        <div className="mt-auto grid grid-cols-2 gap-1">
-          {[['14h', 'Block hrs'], ['2', 'Sectors']].map(([val, label]) => (
-            <div key={label} className="rounded-lg p-1.5" style={{ background: '#F7F5F0' }}>
-              <div className="text-[9px] font-black text-[#222]">{val}</div>
-              <div className="text-[6px] text-[#717171]">{label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Footer */}
-      <div className="px-2.5 py-1.5 text-center border-t" style={{ borderColor: '#F0EDE8' }}>
-        <span className="text-[6px] font-black tracking-widest text-[#B0ABA5] uppercase font-mono">
-          cemrosta.io
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ── Product preview panel ─────────────────────────────────────────────────────
-function ProductPreview() {
+// ── Hero showcase — all 4 product visuals compiled ───────────────────────────
+function HeroShowcase() {
   return (
     <div className="relative w-full max-w-lg mx-auto lg:mx-0 select-none">
+      <div className="grid grid-cols-2 gap-3">
 
-      {/* Main app window */}
-      <div className="rounded-[1.5rem] border border-border bg-white shadow-2xl shadow-black/10 overflow-hidden">
-        {/* Browser chrome */}
-        <div className="flex items-center gap-1.5 px-4 py-3 bg-surface-2 border-b border-border">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-          <span className="w-2.5 h-2.5 rounded-full bg-green-400" />
-          <div className="flex-1 mx-3 bg-white border border-border rounded-full px-3 py-1 text-[10px] text-text-subtle font-mono">
-            cemrosta.vercel.app
+        {/* ── 1. Roster Calendar — full width ─────────────────────────────── */}
+        <div className="col-span-2 rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+          {/* Chrome */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-surface-2 border-b border-border">
+            <span className="text-[10px] font-black font-mono text-text-subtle uppercase tracking-widest">
+              May 2026 · Roster
+            </span>
+            <span className="flex items-center gap-1.5 text-[10px] font-black text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+              Calendar synced
+            </span>
+          </div>
+          {/* Day headers */}
+          <div className="grid grid-cols-7 px-3 pt-2">
+            {['M','T','W','T','F','S','S'].map((d, i) => (
+              <div key={i} className="text-center text-[8px] font-black text-text-subtle pb-1">{d}</div>
+            ))}
+          </div>
+          {/* Grid */}
+          <div className="grid grid-cols-7 gap-0.5 px-3 pb-2.5">
+            {HERO_CELLS.map((day, i) => {
+              if (!day) return <div key={i} />;
+              const duty = HERO_CALENDAR[day];
+              const cls = duty === 'flight'  ? 'bg-sky-50 text-sky-700'
+                        : duty === 'standby' ? 'bg-amber-50 text-amber-700'
+                        : duty === 'rest'    ? 'bg-emerald-50 text-emerald-700'
+                        :                      'text-text-subtle';
+              const dot = duty === 'flight'  ? 'bg-sky-400'
+                        : duty === 'standby' ? 'bg-amber-400'
+                        : duty === 'rest'    ? 'bg-emerald-400' : '';
+              return (
+                <div key={i} className={`flex flex-col items-center justify-center rounded-lg py-1 text-[9px] font-bold leading-none ${cls}`}>
+                  {day}
+                  {dot && <span className={`mt-0.5 w-1 h-1 rounded-full ${dot}`} />}
+                </div>
+              );
+            })}
+          </div>
+          {/* Legend */}
+          <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-surface-2/50">
+            {([['bg-sky-400','Duty'],['bg-amber-400','Standby'],['bg-emerald-400','Rest']] as const).map(([c, l]) => (
+              <div key={l} className="flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${c}`} />
+                <span className="text-[8px] font-bold text-text-subtle">{l}</span>
+              </div>
+            ))}
+            <span className="ml-auto text-[8px] font-black text-accent font-mono">Export .ics →</span>
           </div>
         </div>
 
-        <div className="p-4 space-y-4">
-          {/* Recent Stamps */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-black uppercase italic tracking-tight text-text">Recent Stamps.</span>
-              <span className="text-[9px] font-black font-mono text-text-subtle bg-surface-2 border border-border px-2 py-0.5 rounded-full">
-                4 Unlocked
-              </span>
+        {/* ── 2. Destination Passport — left col ──────────────────────────── */}
+        <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden flex flex-col">
+          <div className="px-3 py-2.5 bg-surface-2 border-b border-border">
+            <p className="text-[8px] font-black text-text-subtle uppercase tracking-widest font-mono">Passport</p>
+            <p className="text-[14px] font-black text-text mt-0.5">47 cities</p>
+          </div>
+          <div className="grid grid-cols-3 gap-1 p-2 flex-1">
+            {PASSPORT_PATCHES.map(({ src, iata }) => (
+              <div key={iata} className="flex flex-col items-center gap-0.5 py-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`${iata} destination patch`} className="w-full aspect-square object-contain" />
+                <span className="text-[7px] font-black text-text-subtle font-mono">{iata}</span>
+              </div>
+            ))}
+          </div>
+          <div className="px-3 py-2 border-t border-border">
+            <span className="text-[8px] font-bold text-text-subtle">+35 more unlocked</span>
+          </div>
+        </div>
+
+        {/* ── 3. Monthly Recap — right col ────────────────────────────────── */}
+        <div
+          className="rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col"
+          style={{ background: '#FFFCF8', borderColor: 'rgba(0,0,0,0.06)' }}
+        >
+          <div className="px-3 py-2.5 bg-white border-b flex items-center justify-between"
+               style={{ borderColor: '#F0EDE8' }}>
+            <p className="text-[8px] font-black uppercase tracking-widest font-mono" style={{ color: '#B0ABA5' }}>
+              Recap
+            </p>
+            <span className="text-[8px] font-black px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(255,56,92,0.10)', color: '#FF385C' }}>
+              May 26
+            </span>
+          </div>
+          <div className="p-3 flex flex-col gap-2.5 flex-1">
+            {/* Avatar */}
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                   style={{ background: 'linear-gradient(135deg,#FF385C,#E61E4D)' }}>
+                AC
+              </div>
+              <div>
+                <p className="text-[10px] font-black leading-none" style={{ color: '#222' }}>Ahmad Crew</p>
+                <p className="text-[8px] leading-none mt-0.5" style={{ color: '#717171' }}>Captain · A350</p>
+              </div>
             </div>
-            <div className="flex gap-3 overflow-hidden">
-              {HERO_PATCHES.map((p) => (
-                <div key={p.iata} className="flex flex-col items-center shrink-0 gap-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.src} alt={p.city} className="w-14 h-14 object-contain drop-shadow-sm" />
-                  <span className="text-[8px] font-black text-text truncate w-14 text-center">{p.city}</span>
-                  <span className="text-[8px] font-black text-text-muted font-mono">1×</span>
+            {/* Big stat */}
+            <div className="rounded-xl p-2.5" style={{ background: '#F7F5F0' }}>
+              <p className="text-[28px] font-black leading-none tracking-tight" style={{ color: '#222' }}>
+                147<span className="text-[11px] font-medium" style={{ color: '#717171' }}>h</span>
+              </p>
+              <p className="text-[8px] font-bold mt-0.5" style={{ color: '#717171' }}>Block hours · May</p>
+            </div>
+            {/* Mini stats */}
+            <div className="grid grid-cols-2 gap-1">
+              {[['18','Flights'],['9','Cities']].map(([v, l]) => (
+                <div key={l} className="rounded-lg p-2" style={{ background: '#F7F5F0' }}>
+                  <p className="text-[14px] font-black leading-none" style={{ color: '#222' }}>{v}</p>
+                  <p className="text-[7px]" style={{ color: '#717171' }}>{l}</p>
                 </div>
               ))}
             </div>
           </div>
+          <div className="px-3 py-2 border-t text-center" style={{ borderColor: '#F0EDE8' }}>
+            <span className="text-[7px] font-black tracking-widest uppercase font-mono" style={{ color: '#B0ABA5' }}>
+              cemrosta.io
+            </span>
+          </div>
+        </div>
 
-          {/* Divider */}
-          <div className="border-t border-border" />
-
-          {/* Roster Details */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] font-black uppercase italic tracking-tight text-text">Roster Details.</span>
-              <div className="h-px flex-1 bg-border/50" />
-              <span className="text-[8px] font-black text-text-subtle font-mono uppercase tracking-widest">Tap to edit</span>
+        {/* ── 4. Family notification — full width ─────────────────────────── */}
+        <div className="col-span-2 rounded-2xl border border-emerald-100 bg-emerald-50 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[9px] font-bold shrink-0">
+              AC
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <MiniTile date="14" status="Duty" from="KUL" to="LHR" flightNo="MH001" time="23:50 → 06:10+" type="flight" />
-              <MiniTile date="15" status="Layover" from="" to="" flightNo="" time="" type="standby" />
-              <MiniTile date="16" status="Duty" from="LHR" to="KUL" flightNo="MH002" time="13:30 → 08:20+" type="flight" />
-              <MiniTile date="17" status="Rest" from="" to="" flightNo="" time="" type="off" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[12px] font-black text-emerald-900 leading-none">Ahmad lands in 3h 20m</p>
+                <span className="text-[8px] font-bold text-emerald-600 bg-white border border-emerald-200 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                  For family
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-emerald-800">LHR → KUL · MH002 · Lands 08:20</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <Clock size={10} className="text-amber-600 shrink-0" />
+                <p className="text-[9px] font-black text-amber-700">Leave home by 06:30 · 55 min to KLIA</p>
+              </div>
             </div>
           </div>
         </div>
+
       </div>
-
-      {/* Floating LiveRosterCard */}
-      <motion.div
-        initial={{ opacity: 0, x: 20, y: 10 }}
-        animate={{ opacity: 1, x: 0, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.6 }}
-        className="absolute -right-4 -bottom-6 lg:-right-10"
-      >
-        <MiniRosterCard />
-      </motion.div>
-
-      {/* Floating badge: "Synced" */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7, duration: 0.5 }}
-        className="absolute -top-3 -left-4 flex items-center gap-1.5 bg-white border border-border rounded-full px-3 py-1.5 shadow-lg text-[10px] font-black text-success"
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-        Calendar synced
-      </motion.div>
     </div>
   );
 }
@@ -214,20 +213,20 @@ export const LandingHero = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-10 lg:gap-20 items-center">
 
-          {/* ── Product preview — first on mobile (top), right on desktop ── */}
+          {/* ── Showcase — first on mobile (top), right on desktop ── */}
           <motion.div
             initial={shouldReduceMotion ? undefined : { opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="relative pb-10 lg:pb-0 w-full order-first lg:order-last"
+            className="relative pb-4 lg:pb-0 w-full order-first lg:order-last"
           >
-            <ProductPreview />
+            <HeroShowcase />
           </motion.div>
 
           {/* ── Copy — second on mobile (bottom), left on desktop ── */}
           <div className="flex flex-col gap-6 lg:gap-8 order-last lg:order-first">
             <motion.div {...fade(0)}>
-              <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-4 md:mb-6">
+              <div className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.35em] text-text-muted font-mono mb-4 md:mb-6">
                 {'// BUILT FOR CREW'}
               </div>
               <h1 className="text-4xl md:text-6xl xl:text-7xl font-black tracking-tighter text-text leading-[0.92] mb-4 md:mb-6">
@@ -246,7 +245,7 @@ export const LandingHero = () => {
                   onClick={() => openAuthModal('signup')}
                   className="w-full sm:w-auto flex items-center justify-center gap-3 bg-accent text-accent-fg px-8 py-4 rounded-full text-[15px] font-black shadow-xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
                 >
-                  Ditch the PDF. It&apos;s free.
+                  Upload my roster — it&apos;s free
                   <ArrowRight size={18} strokeWidth={3} />
                 </button>
                 <button
@@ -283,7 +282,7 @@ export const LandingHero = () => {
 
             {/* Trust strip */}
             <motion.div {...fade(0.35)}
-              className="flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-black uppercase tracking-[0.2em] text-text-muted font-mono border-t border-border pt-6"
+              className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-text-muted font-mono border-t border-border pt-6"
             >
               {[
                 [CheckCircle2, 'Free forever'],

@@ -32,10 +32,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://cemrosta.vercel.app"),
   title: {
-    default: "Cemrosta | The Crew Passport",
+    default: "Cemrosta — Your roster, transformed.",
     template: "%s — Cemrosta",
   },
-  description: "Convert your airline roster to calendar and build your digital destination passport.",
+  description:
+    "Cemrosta converts your AIMS roster PDF into a synced calendar, destination passport, and monthly recap card. Free forever for MAS crew.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -49,10 +50,18 @@ export const metadata: Metadata = {
     locale: "en_MY",
     url: "https://cemrosta.vercel.app",
     siteName: "Cemrosta",
+    title: "Cemrosta — Your roster, transformed.",
+    description:
+      "Drop your AIMS PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
+    images: [{ url: "/api/og/home", width: 1200, height: 630, alt: "Cemrosta — Your roster, transformed." }],
   },
   twitter: {
     card: "summary_large_image",
     creator: "@cemrosta",
+    title: "Cemrosta — Your roster, transformed.",
+    description:
+      "Drop your AIMS PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
+    images: ["/api/og/home"],
   },
 };
 

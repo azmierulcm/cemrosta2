@@ -2,15 +2,17 @@ import { Metadata } from "next";
 import HomeClient from "./HomeClient";
 
 export const metadata: Metadata = {
-  title: "Cemrosta — Your roster, transformed. Built for crew.",
-  description: "Drop your roster PDF. We sync your calendar, track your destinations, and build your lifetime flight passport. Ready in 10 seconds.",
+  title: "Cemrosta — Your roster, transformed.",
+  description:
+    "Cemrosta converts your AIMS roster PDF into a synced calendar, destination passport, and monthly recap card. Free forever for MAS crew.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Cemrosta — Your roster, transformed.",
-    description: "Built for crew. Drop your PDF, sync your calendar, and build your flight passport.",
-    images: ["/api/og/home"],
+    description:
+      "Drop your AIMS PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
+    images: [{ url: "/api/og/home", width: 1200, height: 630, alt: "Cemrosta — Your roster, transformed." }],
   },
 };
 

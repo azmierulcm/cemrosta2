@@ -9,7 +9,7 @@ export const PricingCTA = () => {
   const { openAuthModal } = useAuth();
 
   return (
-    <section className="py-48 px-4 bg-white relative overflow-hidden">
+    <section className="py-10 md:py-20 px-4 bg-white relative overflow-hidden">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent/3 blur-[120px] rounded-full -z-10" />
 
       <div className="max-w-5xl mx-auto text-center relative z-10">
@@ -19,11 +19,11 @@ export const PricingCTA = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <div className="flex items-center justify-center gap-2 mb-8 text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono">
+          <div className="flex items-center justify-center gap-2 mb-8 text-[11px] font-black uppercase tracking-[0.35em] text-text-muted font-mono">
             {'// FINAL BOARDING CALL'}
           </div>
 
-          <h2 className="text-5xl md:text-8xl font-black tracking-tighter text-text mb-8 leading-none">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-text mb-8 leading-none">
             Your next flight is already<br />in the system.
             <br />
             <span className="text-accent italic font-serif font-light">
@@ -31,15 +31,15 @@ export const PricingCTA = () => {
             </span>
           </h2>
 
-          <p className="text-xl md:text-2xl text-text-muted font-bold leading-snug tracking-tight mb-16 max-w-2xl mx-auto">
+          <p className="text-xl md:text-2xl text-text-muted font-bold leading-snug tracking-tight mb-10 md:mb-16 max-w-2xl mx-auto">
             Join crew who&apos;ve synced their roster, collected their cities, and stopped explaining their schedule to their families using hand gestures.
           </p>
 
           <button
             onClick={() => openAuthModal('signup')}
-            className="bg-accent text-accent-fg px-14 py-7 rounded-full text-xl font-black shadow-2xl shadow-accent/20 hover:scale-[1.05] hover:bg-accent-hover transition-all active:scale-95 flex items-center gap-4 mx-auto"
+            className="bg-accent text-accent-fg px-8 py-5 md:px-14 md:py-7 rounded-full text-base md:text-xl font-black shadow-2xl shadow-accent/20 hover:scale-[1.05] hover:bg-accent-hover transition-all active:scale-95 flex items-center gap-3 mx-auto"
           >
-            Create my free account. Boarding now.
+            Upload my roster — it&apos;s free
             <ArrowRight size={24} strokeWidth={3} />
           </button>
 

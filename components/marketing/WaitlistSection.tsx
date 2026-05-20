@@ -27,7 +27,7 @@ export const WaitlistSection = () => {
   };
 
   return (
-    <section className="py-32 px-4 bg-text relative overflow-hidden">
+    <section className="py-10 md:py-16 px-4 bg-text relative overflow-hidden">
       {/* Subtle glow */}
       <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-accent/20 blur-[120px] rounded-full" />
 
@@ -43,7 +43,7 @@ export const WaitlistSection = () => {
             {'// COMING SOON'}
           </div>
 
-          <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-white leading-tight mb-6">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-white leading-tight mb-6">
             AirAsia crew, Batik crew —<br />
             <span style={{ color: '#FF385C' }}>we see you. We&apos;re coming.</span>
           </h2>
