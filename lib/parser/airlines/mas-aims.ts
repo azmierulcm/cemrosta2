@@ -49,6 +49,9 @@ const NON_PORT = new Set([
 const OFF_CODES: Record<string, string> = {
   D:    'Day Off',
   DO:   'Earned Day Off',
+  DO1:  'Request Day Off',
+  DO2:  'Request Day Off',
+  DO3:  'Request Day Off',
   OFF:  'Day Off',
   REST: 'Rest Day',
   AL:   'Annual Leave',
@@ -78,7 +81,27 @@ const TRAINING_CODES: Record<string, string> = {
   CBT:       'Computer-Based Training',
   RECURRENT: 'Recurrent Training',
   TRG:       'Training',
+  TDC:       'Trainers Development Course',
+  TDC1:      'Trainers Development Course',
+  TDC2:      'Trainers Development Course — Refresher',
+  TDC3:      'Trainers Development Course',
 };
+
+// Resolve friendly names for AIMS alphanumeric simulator session codes
+// e.g. "330AOP31" → "A330 Simulator — OPC Session 31"
+const SIM_SESSION_MAP: Record<string, string> = {
+  AOP: 'OPC', BLP: 'LPC', OPC: 'OPC', LPC: 'LPC',
+  SIM: 'SIM', ETP: 'ETP', UPR: 'Upgrade', REC: 'Recurrent',
+};
+function resolveSimCode(code: string): string {
+  if (TRAINING_CODES[code]) return TRAINING_CODES[code];
+  const m = code.match(/^(\d{3})([A-Z]{2,4})(\d+)$/);
+  if (m) {
+    const sessType = SIM_SESSION_MAP[m[2]] ?? m[2];
+    return `A${m[1]} Simulator — ${sessType} Session ${m[3]}`;
+  }
+  return `Simulator — ${code}`;
+}
 
 const MONTH_MAP: Record<string, string> = {
   JAN:'01',FEB:'02',MAR:'03',APR:'04',MAY:'05',JUN:'06',
@@ -183,9 +206,13 @@ function inferRosterPeriod(matches: RegExpMatchArray[]): { month: string; year: 
 type FlightToken =
   | { t: 'port';     v: string }
   | { t: 'time';     v: string }
-  | { t: 'op' }
+  | { t: 'op';       v: string }   // work type: 'OP' | 'SFP' | …
   | { t: 'dutycode'; v: string }
   | { t: 'actype';   v: string };
+
+// Work type codes that sit between the route and the block/duty hours columns.
+// Treating these like 'OP' ensures subsequent numeric fields are correctly parsed.
+const WORK_TYPE_CODES = new Set(['OP', 'SFP']);
 
 function tokenizeFlightChunk(raw: string): FlightToken[] {
   const tokens: FlightToken[] = [];
@@ -196,12 +223,14 @@ function tokenizeFlightChunk(raw: string): FlightToken[] {
     const w = m[1];
     if (/^\d{2}:\d{2}$/.test(w)) {
       tokens.push({ t: 'time', v: w });
-    } else if (w === 'OP') {
-      tokens.push({ t: 'op' });
+    } else if (WORK_TYPE_CODES.has(w)) {
+      // 'OP', 'SFP' etc. — marks the boundary before block/duty hours columns
+      tokens.push({ t: 'op', v: w });
       seenOP = true;
     } else if (!seenOP && /^[A-Z]{3}$/.test(w) && !NON_PORT.has(w)) {
       tokens.push({ t: 'port', v: w });
-    } else if (seenOP && /^[A-Z]{2}$/.test(w) && !['OP','MC','FO','CA','DC','SG'].includes(w)) {
+    } else if (seenOP && /^[A-Z]{2,3}$/.test(w) && !WORK_TYPE_CODES.has(w) && !['MC','FO','CA','DC','SG'].includes(w)) {
+      // Accept 2- or 3-letter duty codes (e.g. 'BA', 'TRI')
       tokens.push({ t: 'dutycode', v: w });
     } else if (/^\d{3}$/.test(w)) {
       tokens.push({ t: 'actype', v: w });
@@ -247,7 +276,7 @@ function parseFlightTokens(tokens: FlightToken[]): FlightFields {
   if (peek('time')) dutyEnd = take('time')!.v;
 
   let workType: string | undefined;
-  if (peek('op')) { take('op'); workType = 'OP'; }
+  if (peek('op')) { workType = take('op')!.v; }
 
   const blockHrs = take('time')?.v;
   const dutyHrs  = take('time')?.v;
@@ -359,14 +388,24 @@ function parseDayChunk(
   }
 
   // ── 3. Training / simulator ──────────────────────────────────────────────
-  // Short standard codes
-  const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG)\b/i;
-  // Long AIMS alphanumeric training codes (e.g. "350AOP35", "A353UPRR", "A353ETPR", "353RRCYA")
+  // Short standard codes (including TDC course codes e.g. TDC2)
+  const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG|TDC\d*)\b/i;
+  // Long AIMS alphanumeric training codes (e.g. "A353UPRR", "A353ETPR", "353RRCYA")
   const trnLongRe  = /\b([A-Z0-9]{5,}(?:OPC|SIM|TRN|UPR|ETP|REC|UPRR|ETPR|RRCYA)[A-Z0-9]*)\b/i;
-  const trnM = chunk.match(trnShortRe) ?? chunk.match(trnLongRe);
+  // AIMS simulator session codes: 3-digit AC type + 2-4 letter session type + 2-digit session number
+  // e.g. "330AOP31", "350AOP34", "330BLP35", "330AOP35"
+  const aimsSimRe  = /\b(\d{3}[A-Z]{2,4}\d+)\b/;
+  const trnM = chunk.match(trnShortRe) ?? chunk.match(trnLongRe) ?? chunk.match(aimsSimRe);
   if (trnM) {
     const code  = trnM[1].toUpperCase();
     const times = chunk.match(/\d{2}:\d{2}/g) ?? [];
+    // AIMS sim/course layout: [signOn, simStart, simEnd?, dutyEnd?, blockHrs(00:00), dutyHrs]
+    // Last two HH:MM values are block hours and duty hours; third-from-last is duty end.
+    const blockHrs = times.length >= 2 ? times[times.length - 2] : undefined;
+    const dutyHrs  = times.length >= 1 ? times.at(-1)            : undefined;
+    const signOff  = times.length >= 3 ? times[times.length - 3] : undefined;
+    // Capture instructor/examiner role duty code (TRI, TRE, SFE, DEC, IRE etc.)
+    const dcMatch  = chunk.match(/\b(TRI|TRE|SFE|DEC|IRE)\b/);
     duties.push({
       id:          `TRN-${dateISO}`,
       type:        'TRAINING',
@@ -374,15 +413,19 @@ function parseDayChunk(
       day,
       item:        code,
       signOn:      times[0],
-      signOff:     times.at(-1),
-      description: TRAINING_CODES[code] ?? `Training — ${code}`,
+      signOff,
+      blockHrs,
+      dutyHrs,
+      dutyCode:    dcMatch?.[1],
+      description: resolveSimCode(code),
     });
     return duties;
   }
 
   // ── 4. Off / leave / medical ─────────────────────────────────────────────
   // Longer codes first so "DO" doesn't get partially matched before "D".
-  const offRe = /\b(DO|MC[1-4]|COMP|CMP|OFF|REST|AL|SL|ML|HL|PH|EL|D)\b/;
+  // DO[1-9]? before bare DO so "DO1" is matched as a whole token, not just "DO"
+  const offRe = /\b(DO[1-9]?|MC[1-4]|COMP|CMP|OFF|REST|AL|SL|ML|HL|PH|EL|D)\b/;
   const offM  = chunk.match(offRe);
   if (offM) {
     const code = offM[1].toUpperCase();

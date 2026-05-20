@@ -46,7 +46,7 @@ export const Footer = () => {
               <li><Link href="/profile" className="text-sm font-bold text-text-muted hover:text-text transition-colors">Digital Passport</Link></li>
               <li>
                 <Link href="/marketplace" className="text-sm font-bold text-text-muted hover:text-text transition-colors">
-                  Marketplace <span className="text-[11px] font-black text-text-subtle opacity-60">(coming soon)</span>
+                  Marketplace <span className="text-[11px] font-black text-accent/70">(crew only)</span>
                 </Link>
               </li>
             </ul>
