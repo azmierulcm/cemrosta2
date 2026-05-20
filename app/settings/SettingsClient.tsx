@@ -274,11 +274,15 @@ export default function SettingsClient() {
         <div className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-3">
           {'// CREW PROFILE'}
         </div>
-        <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-text leading-none">
-          Your settings.
+        <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-text leading-none min-h-[1.1em]">
+          <FlipWords
+            words={['Selamat Datang.', '欢迎登机.', 'Bienvenue.', 'Bienvenido.', '搭乗歡迎.', 'Willkommen.', 'أهلاً بك.']}
+            duration={3200}
+          />
         </h1>
-        <p className="text-text-muted font-bold mt-3 text-base leading-snug">
-          This info appears on your passport, dashboard greeting, and shareable recap cards.
+        <p className="text-text-muted font-bold mt-3 text-base leading-snug max-w-lg">
+          This is the info we use to make your passport, dashboard, and recap cards look{' '}
+          <span className="text-text italic">professionally well-travelled.</span>
         </p>
       </div>
 
