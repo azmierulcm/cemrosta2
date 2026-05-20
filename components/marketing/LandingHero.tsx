@@ -231,28 +231,34 @@ export const LandingHero = () => {
                 {'// BUILT FOR CREW'}
               </div>
               <h1 className="text-4xl md:text-6xl xl:text-7xl font-black tracking-tighter text-text leading-[0.92] mb-4 md:mb-6">
-                Roster screenshots?{' '}
-                <span className="text-accent italic">Sudah-lah.</span>
+                Your roster PDF has been holding you hostage{' '}
+                <span className="text-accent italic">since 2009.</span>
+                <br />Today, we negotiate.
               </h1>
               <p className="text-base md:text-xl text-text-muted font-bold leading-snug tracking-tight max-w-lg">
-                Drop your PDF roster. See your duties, sync your calendar, and build your lifetime digital passport — one city at a time.
+                Drop your AIMS PDF. Get a synced calendar, a lifetime destination passport, and the ability to explain your schedule to your family without drawing a diagram on a napkin.
               </p>
             </motion.div>
 
-            <motion.div {...fade(0.15)} className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => openAuthModal('signup')}
-                className="w-full sm:w-auto flex items-center justify-center gap-3 bg-accent text-accent-fg px-8 py-4 rounded-full text-[15px] font-black shadow-xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
-              >
-                Get started free
-                <ArrowRight size={18} strokeWidth={3} />
-              </button>
-              <button
-                onClick={() => openAuthModal('login')}
-                className="w-full sm:w-auto flex items-center justify-center gap-3 border border-border px-8 py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
-              >
-                Sign in
-              </button>
+            <motion.div {...fade(0.15)} className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => openAuthModal('signup')}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 bg-accent text-accent-fg px-8 py-4 rounded-full text-[15px] font-black shadow-xl shadow-accent/20 hover:scale-[1.03] hover:bg-accent-hover transition-all active:scale-95"
+                >
+                  Ditch the PDF. It&apos;s free.
+                  <ArrowRight size={18} strokeWidth={3} />
+                </button>
+                <button
+                  onClick={() => openAuthModal('login')}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 border border-border px-8 py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
+                >
+                  Already crew? Sign in.
+                </button>
+              </div>
+              <p className="text-[12px] text-text-subtle font-bold italic pl-1">
+                Not crew? You&apos;re in the wrong place, but also welcome.
+              </p>
             </motion.div>
 
             {/* Format pills */}
@@ -280,10 +286,10 @@ export const LandingHero = () => {
               className="flex flex-wrap gap-x-6 gap-y-2 text-[11px] font-black uppercase tracking-[0.2em] text-text-muted font-mono border-t border-border pt-6"
             >
               {[
-                [Zap,          'MAS AIMS Support'],
-                [CheckCircle2, 'Lifetime Passport'],
-                [ShieldCheck,  'Your data, yours alone'],
-                [Heart,        'Built for crew'],
+                [CheckCircle2, 'Free forever'],
+                [Zap,          'No credit card'],
+                [ShieldCheck,  'Works with MAS AIMS'],
+                [Heart,        "Your data stays yours — we're not your airline's IT dept"],
               ].map(([Icon, label]) => (
                 <div key={label as string} className="flex items-center gap-2">
                   {React.createElement(Icon as React.ElementType, { size: 13, className: 'text-accent' })}

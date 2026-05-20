@@ -7,6 +7,7 @@ import { ComparisonSection } from '@/components/marketing/ComparisonSection';
 import { HowItWorks } from '@/components/marketing/HowItWorks';
 import { PassportTeaser } from '@/components/marketing/PassportTeaser';
 import { AudienceSection } from '@/components/marketing/AudienceSection';
+import { WaitlistSection } from '@/components/marketing/WaitlistSection';
 import { PricingCTA } from '@/components/marketing/PricingCTA';
 import { Dashboard } from '@/components/product/Dashboard';
 import { FileUploader } from '@/components/product/FileUploader';
@@ -89,6 +90,7 @@ export default function HomeClient() {
               <HowItWorks />
               <PassportTeaser />
               <AudienceSection />
+              <WaitlistSection />
               <PricingCTA />
               <Footer />
             </motion.div>
