@@ -3,21 +3,17 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toPng } from 'html-to-image';
-import { Download, Share2, Plane, Car, Home, Clock, AlertCircle, Check } from 'lucide-react';
+import { Download, Share2, Plane, Car, Home, AlertCircle, Check, ArrowRight } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import type { DutyEvent } from '@/lib/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FamilyCard — shareable crew schedule view for family members
 //
-// Surfaces three views from the active roster:
-//   • Send-offs  (crew departs from base)
-//   • Pick-ups   (crew returns to base)
-//   • Free days  (OFF duty — plan together)
-//   • Standby    (on-call — stay flexible)
-//
-// The "Download Card" button captures the printable card as a high-res PNG
-// using html-to-image (same library as RecapModal).
+// Surfaces the month as three compact sections:
+//   • Trips      — send-off + pick-up PAIRED per flight rotation
+//   • Standby    — on-call days shown as compact chips
+//   • Free Days  — off days shown as a number grid
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -28,25 +24,19 @@ const MONTH_NAMES: Record<string, string> = {
   SEP:'September',OCT:'October', NOV:'November', DEC:'December',
 };
 
-const DAY_LABELS: Record<string, string> = {
-  MON:'Mon', TUE:'Tue', WED:'Wed', THU:'Thu', FRI:'Fri', SAT:'Sat', SUN:'Sun',
-};
-
-/** Parse ISO date → day of month */
 function dom(iso: string): number {
   return parseInt(iso.split('-')[2], 10);
 }
 
-/** Format date to "6 May, Wed" */
 function formatDate(iso: string, day?: string): string {
-  const [, , d] = iso.split('-');
-  const monthAbbr = iso.split('-')[1];
+  const parts = iso.split('-');
   const months = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const dayLabel = day ? DAY_LABELS[day] ?? day : '';
-  return `${parseInt(d, 10)} ${months[parseInt(monthAbbr, 10)]}${dayLabel ? ` · ${dayLabel}` : ''}`;
+  const d = parseInt(parts[2], 10);
+  const m = months[parseInt(parts[1], 10)];
+  const dayLabel = day ? day.slice(0, 3) : '';
+  return dayLabel ? `${d} ${m} · ${dayLabel}` : `${d} ${m}`;
 }
 
-/** Add minutes to HH:MM time string */
 function addMinutes(time: string, mins: number): string {
   if (!time || !time.includes(':')) return time;
   const [h, m] = time.split(':').map(Number);
@@ -56,160 +46,310 @@ function addMinutes(time: string, mins: number): string {
   return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
 }
 
-/** Subtract minutes from HH:MM time string */
 function subMinutes(time: string, mins: number): string {
   return addMinutes(time, -mins);
 }
 
-// ── Data derivation ───────────────────────────────────────────────────────────
+// ── Data model ────────────────────────────────────────────────────────────────
 
-interface FamilyEvent {
-  kind: 'sendoff' | 'pickup' | 'standby' | 'off';
-  date: string;
-  day?: string;
-  flightNo?: string;
-  route?: string;
-  time?: string;         // dep time for sendoff, arr time for pickup
-  dutyStart?: string;    // standby start
-  dutyEnd?: string;      // standby end
-  description?: string;
+interface Trip {
+  id: string;
+  // Outbound (departs base)
+  departDate?: string;
+  departDay?: string;
+  departFlight?: string;
+  departRoute?: string;   // "KUL → LHR"
+  departTime?: string;    // STD
+  // Inbound (arrives base)
+  returnDate?: string;
+  returnDay?: string;
+  returnFlight?: string;
+  returnRoute?: string;   // "LHR → KUL"
+  returnTime?: string;    // STA
+  // Computed
+  daysAway?: number;
 }
 
-function deriveEvents(events: DutyEvent[], base = 'KUL'): FamilyEvent[] {
-  const result: FamilyEvent[] = [];
+interface StandbyDay {
+  date: string;
+  day?: string;
+  description?: string;
+  dutyStart?: string;
+  dutyEnd?: string;
+}
 
-  for (const e of events) {
-    if (e.type === 'FLIGHT') {
-      // Send-off: flight departs from base
-      if (e.depPort === base && e.std) {
-        result.push({
-          kind:     'sendoff',
-          date:     e.date,
-          day:      e.day,
-          flightNo: e.flightNumber ?? e.item,
-          route:    e.depPort && e.arrPort ? `${e.depPort} → ${e.arrPort}` : undefined,
-          time:     e.std,
-        });
-      }
-      // Pick-up: flight arrives at base
-      if (e.arrPort === base && e.sta) {
-        result.push({
-          kind:     'pickup',
-          date:     e.date,
-          day:      e.day,
-          flightNo: e.flightNumber ?? e.item,
-          route:    e.depPort && e.arrPort ? `${e.depPort} → ${e.arrPort}` : undefined,
-          time:     e.sta,
-        });
-      }
-    } else if (e.type === 'STANDBY') {
-      result.push({
-        kind:        'standby',
-        date:        e.date,
-        day:         e.day,
-        description: e.item ?? 'Standby',
-        dutyStart:   e.signOn,
-        dutyEnd:     e.signOff,
-      });
-    } else if (e.type === 'OFF') {
-      result.push({
-        kind:        'off',
-        date:        e.date,
-        day:         e.day,
-        description: e.description ?? e.item,
+interface FreeDay {
+  date: string;
+  day?: string;
+}
+
+interface FamilyData {
+  trips: Trip[];
+  standbyDays: StandbyDay[];
+  freeDays: FreeDay[];
+}
+
+// ── Derivation ────────────────────────────────────────────────────────────────
+
+function deriveFamily(events: DutyEvent[], base = 'KUL'): FamilyData {
+  const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
+
+  const sendoffs = sorted.filter(e => e.type === 'FLIGHT' && e.depPort === base);
+  const pickups  = sorted.filter(e => e.type === 'FLIGHT' && e.arrPort === base);
+  const standby  = sorted.filter(e => e.type === 'STANDBY');
+  const off      = sorted.filter(e => e.type === 'OFF');
+
+  // Pair send-offs with their next pick-up greedily
+  const usedPickup = new Set<string>();
+  const trips: Trip[] = [];
+
+  for (const s of sendoffs) {
+    const ret = pickups.find(p => p.date >= s.date && !usedPickup.has(p.date));
+
+    const trip: Trip = {
+      id: `trip-${s.date}-${s.flightNumber ?? s.item ?? ''}`,
+      departDate:   s.date,
+      departDay:    s.day,
+      departFlight: s.flightNumber ?? s.item,
+      departRoute:  s.depPort && s.arrPort ? `${s.depPort} → ${s.arrPort}` : undefined,
+      departTime:   s.std,
+    };
+
+    if (ret) {
+      usedPickup.add(ret.date);
+      trip.returnDate   = ret.date;
+      trip.returnDay    = ret.day;
+      trip.returnFlight = ret.flightNumber ?? ret.item;
+      trip.returnRoute  = ret.depPort && ret.arrPort ? `${ret.depPort} → ${ret.arrPort}` : undefined;
+      trip.returnTime   = ret.sta;
+      trip.daysAway     = Math.round(
+        (new Date(ret.date).getTime() - new Date(s.date).getTime()) / 86_400_000,
+      );
+    }
+
+    trips.push(trip);
+  }
+
+  // Orphan pick-ups (crew departed last month, arrives this month)
+  for (const p of pickups) {
+    if (!usedPickup.has(p.date)) {
+      trips.push({
+        id: `ret-${p.date}`,
+        returnDate:   p.date,
+        returnDay:    p.day,
+        returnFlight: p.flightNumber ?? p.item,
+        returnRoute:  p.depPort && p.arrPort ? `${p.depPort} → ${p.arrPort}` : undefined,
+        returnTime:   p.sta,
       });
     }
   }
 
-  return result.sort((a, b) => a.date.localeCompare(b.date));
+  trips.sort((a, b) =>
+    (a.departDate ?? a.returnDate ?? '').localeCompare(b.departDate ?? b.returnDate ?? ''),
+  );
+
+  return {
+    trips,
+    standbyDays: standby.map(e => ({
+      date: e.date, day: e.day,
+      description: e.item,
+      dutyStart: e.signOn,
+      dutyEnd:   e.signOff,
+    })),
+    freeDays: off.map(e => ({ date: e.date, day: e.day })),
+  };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Trip Tile ─────────────────────────────────────────────────────────────────
 
-function SendOffCard({ ev }: { ev: FamilyEvent }) {
-  const suggestedArrival = ev.time ? subMinutes(ev.time, 150) : undefined; // 2.5h before dep
+function TripTile({ trip }: { trip: Trip }) {
+  const nightsLabel =
+    trip.daysAway != null
+      ? `${trip.daysAway} night${trip.daysAway !== 1 ? 's' : ''} away`
+      : trip.returnDate && !trip.departDate
+        ? 'Returning this month'
+        : 'No return this month';
+
   return (
-    <div className="rounded-2xl overflow-hidden border border-border">
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-sky-50 border-b border-sky-100">
-        <Plane size={13} className="text-sky-600 shrink-0" style={{ transform: 'rotate(45deg)' }} />
-        <span className="text-[11px] font-black uppercase tracking-widest text-sky-700 font-mono">Send-off</span>
-        <span className="ml-auto text-[11px] font-bold text-sky-600">{formatDate(ev.date, ev.day)}</span>
+    <div className="rounded-2xl overflow-hidden border border-border bg-white">
+      {/* Header strip */}
+      <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-border">
+        <Plane size={11} className="text-slate-400" />
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 font-mono flex-1">
+          {nightsLabel}
+        </span>
+        {trip.departFlight && trip.returnFlight && trip.departFlight !== trip.returnFlight && (
+          <span className="text-[9px] font-bold text-slate-400 font-mono">
+            {trip.departFlight} · {trip.returnFlight}
+          </span>
+        )}
+        {(trip.departFlight === trip.returnFlight || (!trip.returnFlight && trip.departFlight)) && (
+          <span className="text-[9px] font-bold text-slate-400 font-mono">{trip.departFlight}</span>
+        )}
       </div>
-      <div className="px-4 py-3 bg-white space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[17px] font-black text-text tracking-tight">{ev.flightNo}</span>
-          <span className="text-[13px] font-black text-text-muted font-mono">{ev.route}</span>
-        </div>
-        <div className="flex items-center gap-2 text-[12px] text-text-muted font-bold">
-          <Clock size={11} className="shrink-0" />
-          <span>Departs <strong className="text-text">{ev.time}</strong></span>
-        </div>
-        {suggestedArrival && (
-          <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-sky-50">
-            <Car size={12} className="text-sky-600 shrink-0" />
-            <span className="text-[11px] font-bold text-sky-700">
-              Drop at KLIA by <strong>{suggestedArrival}</strong> · Allow 30 min traffic buffer
-            </span>
+
+      {/* Two halves */}
+      <div className="grid grid-cols-2 divide-x divide-border">
+
+        {/* ── Send-off ── */}
+        {trip.departDate ? (
+          <div className="p-4 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-lg bg-sky-50 flex items-center justify-center">
+                <Plane size={10} className="text-sky-500" style={{ transform: 'rotate(45deg)' }} />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-sky-600">Send-off</span>
+            </div>
+            <div>
+              <div className="text-[13px] font-black text-text leading-tight">
+                {formatDate(trip.departDate, trip.departDay)}
+              </div>
+              <div className="text-[11px] font-bold text-text-muted font-mono mt-0.5">
+                {trip.departRoute}
+              </div>
+            </div>
+            {trip.departTime && (
+              <div className="text-[20px] font-black text-text font-mono leading-none">
+                {trip.departTime}
+              </div>
+            )}
+            {trip.departTime && (
+              <div className="flex items-center gap-1.5 bg-sky-50 rounded-xl px-2.5 py-1.5">
+                <Car size={10} className="text-sky-500 shrink-0" />
+                <span className="text-[10px] font-bold text-sky-700 leading-tight">
+                  Drop by{' '}
+                  <strong className="font-black">{subMinutes(trip.departTime, 150)}</strong>
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 flex items-center justify-center">
+            <p className="text-[10px] font-bold text-text-subtle text-center italic leading-snug">
+              Departed<br />last month
+            </p>
           </div>
         )}
+
+        {/* ── Pick-up ── */}
+        {trip.returnDate ? (
+          <div className="p-4 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-lg bg-green-50 flex items-center justify-center">
+                <Plane size={10} className="text-green-500" style={{ transform: 'rotate(225deg)' }} />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-green-600">Pick-up</span>
+            </div>
+            <div>
+              <div className="text-[13px] font-black text-text leading-tight">
+                {formatDate(trip.returnDate, trip.returnDay)}
+              </div>
+              <div className="text-[11px] font-bold text-text-muted font-mono mt-0.5">
+                {trip.returnRoute}
+              </div>
+            </div>
+            {trip.returnTime && (
+              <div className="text-[20px] font-black text-text font-mono leading-none">
+                {trip.returnTime}
+              </div>
+            )}
+            {trip.returnTime && (
+              <div className="flex items-center gap-1.5 bg-green-50 rounded-xl px-2.5 py-1.5">
+                <Car size={10} className="text-green-500 shrink-0" />
+                <span className="text-[10px] font-bold text-green-700 leading-tight">
+                  Pick up at{' '}
+                  <strong className="font-black">{addMinutes(trip.returnTime, 40)}</strong>
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 flex items-center justify-center">
+            <p className="text-[10px] font-bold text-text-subtle text-center italic leading-snug">
+              Returns<br />next month
+            </p>
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
 
-function PickUpCard({ ev }: { ev: FamilyEvent }) {
-  const suggestedPickup = ev.time ? addMinutes(ev.time, 40) : undefined; // 40 min after landing
-  return (
-    <div className="rounded-2xl overflow-hidden border border-border">
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border-b border-green-100">
-        <Plane size={13} className="text-green-600 shrink-0" style={{ transform: 'rotate(-45deg) scaleX(-1)' }} />
-        <span className="text-[11px] font-black uppercase tracking-widest text-green-700 font-mono">Pick-up</span>
-        <span className="ml-auto text-[11px] font-bold text-green-600">{formatDate(ev.date, ev.day)}</span>
-      </div>
-      <div className="px-4 py-3 bg-white space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[17px] font-black text-text tracking-tight">{ev.flightNo}</span>
-          <span className="text-[13px] font-black text-text-muted font-mono">{ev.route}</span>
-        </div>
-        <div className="flex items-center gap-2 text-[12px] text-text-muted font-bold">
-          <Clock size={11} className="shrink-0" />
-          <span>Lands <strong className="text-text">{ev.time}</strong></span>
-        </div>
-        {suggestedPickup && (
-          <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-green-50">
-            <Car size={12} className="text-green-600 shrink-0" />
-            <span className="text-[11px] font-bold text-green-700">
-              Be at KLIA arrival hall by <strong>{suggestedPickup}</strong>
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// ── Standby Section ───────────────────────────────────────────────────────────
 
-function StandbyCard({ ev }: { ev: FamilyEvent }) {
+function StandbySection({ days }: { days: StandbyDay[] }) {
   return (
     <div className="rounded-2xl overflow-hidden border border-amber-100">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border-b border-amber-100">
-        <AlertCircle size={13} className="text-amber-600 shrink-0" />
-        <span className="text-[11px] font-black uppercase tracking-widest text-amber-700 font-mono">On Standby</span>
-        <span className="ml-auto text-[11px] font-bold text-amber-600">{formatDate(ev.date, ev.day)}</span>
+        <AlertCircle size={11} className="text-amber-500" />
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-700 font-mono">
+          Standby · {days.length} {days.length === 1 ? 'day' : 'days'}
+        </span>
+        <span className="ml-auto text-[9px] font-bold text-amber-500 italic">
+          may get called anytime
+        </span>
       </div>
-      <div className="px-4 py-3 bg-white">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[13px] font-black text-text">{ev.description}</span>
-          {ev.dutyStart && (
-            <span className="text-[12px] font-bold text-text-muted font-mono">
-              {ev.dutyStart}
-              {ev.dutyEnd ? ` – ${ev.dutyEnd}` : ''}
+      <div className="px-4 py-3 bg-white flex flex-wrap gap-2">
+        {days.map((d, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-1.5 border border-amber-100 bg-amber-50 rounded-xl px-3 py-1.5"
+          >
+            <span className="text-[14px] font-black text-amber-900 leading-none">{dom(d.date)}</span>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold text-amber-600 uppercase leading-none">{d.day?.slice(0, 3)}</span>
+              {d.dutyStart && (
+                <span className="text-[8px] font-mono text-amber-500 leading-none mt-0.5">
+                  {d.dutyStart}{d.dutyEnd ? `–${d.dutyEnd}` : ''}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Free Days Section ─────────────────────────────────────────────────────────
+
+function FreeDaysSection({ days }: { days: FreeDay[] }) {
+  return (
+    <div className="rounded-2xl overflow-hidden border border-green-100">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border-b border-green-100">
+        <Home size={11} className="text-green-500" />
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-green-700 font-mono">
+          Free Days · {days.length}
+        </span>
+        <span className="ml-auto text-[9px] font-bold text-green-500 italic">
+          plan something together ✨
+        </span>
+      </div>
+      <div className="px-4 py-3 bg-white flex flex-wrap gap-2">
+        {days.map((d, i) => (
+          <div
+            key={i}
+            className="flex flex-col items-center bg-green-50 border border-green-100 rounded-xl px-3 py-2 min-w-[42px]"
+          >
+            <span className="text-[17px] font-black text-green-800 leading-none">{dom(d.date)}</span>
+            <span className="text-[8px] font-bold text-green-500 uppercase mt-0.5 tracking-wide">
+              {d.day?.slice(0, 3)}
             </span>
-          )}
-        </div>
-        <p className="text-[11px] text-text-subtle font-medium">
-          May get called to fly anytime during this window. Keep plans flexible.
-        </p>
+          </div>
+        ))}
       </div>
+    </div>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+function Empty({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <Check size={16} className="text-text-subtle mb-2" />
+      <p className="text-[12px] text-text-muted font-bold">{label}</p>
     </div>
   );
 }
@@ -221,20 +361,20 @@ interface PrintCardProps {
   rank?: string;
   month: string;
   year: string;
-  sendoffs: FamilyEvent[];
-  pickups: FamilyEvent[];
-  freeDays: FamilyEvent[];
-  standbyDays: FamilyEvent[];
+  trips: Trip[];
+  standbyDays: StandbyDay[];
+  freeDays: FreeDay[];
 }
 
 const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(
-  ({ crewName, rank, month, year, sendoffs, pickups, freeDays, standbyDays }, ref) => {
+  ({ crewName, rank, month, year, trips, standbyDays, freeDays }, ref) => {
     const monthLabel = MONTH_NAMES[month] ?? month;
+
     return (
       <div
         ref={ref}
         style={{
-          width: 390,
+          width: 420,
           background: '#FFFCF8',
           fontFamily: 'Inter, -apple-system, sans-serif',
           borderRadius: 24,
@@ -244,154 +384,130 @@ const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(
         }}
       >
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg,#FF385C,#E61E4D)', padding: '24px 24px 20px' }}>
+        <div style={{ background: 'linear-gradient(135deg,#FF385C,#E61E4D)', padding: '22px 24px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 800, letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: 6 }}>
+              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 9, fontWeight: 800, letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: 5 }}>
                 Crew Family Hub
               </div>
-              <div style={{ color: '#fff', fontSize: 22, fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.5px' }}>
+              <div style={{ color: '#fff', fontSize: 20, fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.5px' }}>
                 {crewName.split(' ').slice(0, 2).join(' ')}
               </div>
               {rank && (
-                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 700, marginTop: 3 }}>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, marginTop: 3 }}>
                   {rank} · Malaysia Airlines
                 </div>
               )}
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-                Schedule
-              </div>
-              <div style={{ color: '#fff', fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px' }}>
-                {monthLabel}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700 }}>{year}</div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase' }}>Schedule</div>
+              <div style={{ color: '#fff', fontSize: 17, fontWeight: 900, letterSpacing: '-0.5px' }}>{monthLabel}</div>
+              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 700 }}>{year}</div>
             </div>
           </div>
         </div>
 
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Send-offs */}
-          {sendoffs.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 8, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 12 }}>🛫</span>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#3B82F6' }}>
-                  Send-offs ({sendoffs.length})
+          {/* Trips */}
+          {trips.map((trip, i) => (
+            <div key={i} style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #E5E7EB' }}>
+              {/* Trip header */}
+              <div style={{ background: '#F8FAFC', borderBottom: '1px solid #E5E7EB', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#94A3B8', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace', flex: 1 }}>
+                  {trip.daysAway != null ? `${trip.daysAway} night${trip.daysAway !== 1 ? 's' : ''} away` : 'Flight'}
                 </span>
+                {trip.departFlight && (
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', fontFamily: 'monospace' }}>
+                    {trip.departFlight}{trip.returnFlight && trip.returnFlight !== trip.departFlight ? ` · ${trip.returnFlight}` : ''}
+                  </span>
+                )}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sendoffs.map((ev, i) => (
-                  <div key={i} style={{ border: '1px solid #BFDBFE', borderRadius: 14, overflow: 'hidden' }}>
-                    <div style={{ background: '#EFF6FF', padding: '8px 14px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#1D4ED8' }}>{formatDate(ev.date, ev.day)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#3B82F6', fontFamily: 'monospace' }}>{ev.route}</span>
-                    </div>
-                    <div style={{ background: '#fff', padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 15, fontWeight: 900, color: '#111' }}>{ev.flightNo}</span>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: '#111', fontFamily: 'monospace' }}>Dep {ev.time}</span>
+
+              {/* Two halves */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#fff' }}>
+
+                {/* Send-off */}
+                {trip.departDate ? (
+                  <div style={{ padding: '12px', borderRight: '1px solid #F3F4F6' }}>
+                    <div style={{ fontSize: 8, fontWeight: 900, color: '#0EA5E9', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>🛫 SEND-OFF</div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: '#111', lineHeight: 1.2 }}>{formatDate(trip.departDate, trip.departDay)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', fontFamily: 'monospace', marginTop: 2 }}>{trip.departRoute}</div>
+                    {trip.departTime && (
+                      <div style={{ fontSize: 18, fontWeight: 900, color: '#111', fontFamily: 'monospace', marginTop: 6, lineHeight: 1 }}>{trip.departTime}</div>
+                    )}
+                    {trip.departTime && (
+                      <div style={{ marginTop: 8, background: '#EFF6FF', borderRadius: 8, padding: '5px 8px', fontSize: 9, fontWeight: 700, color: '#1D4ED8' }}>
+                        🚗 Drop by {subMinutes(trip.departTime, 150)}
                       </div>
-                      {ev.time && (
-                        <div style={{ background: '#EFF6FF', borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1D4ED8' }}>
-                          🚗 Drop at KLIA by {subMinutes(ev.time, 150)}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                ))}
+                ) : (
+                  <div style={{ padding: '12px', borderRight: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 9, color: '#9CA3AF', fontStyle: 'italic' }}>Departed last month</span>
+                  </div>
+                )}
+
+                {/* Pick-up */}
+                {trip.returnDate ? (
+                  <div style={{ padding: '12px' }}>
+                    <div style={{ fontSize: 8, fontWeight: 900, color: '#10B981', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>🛬 PICK-UP</div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: '#111', lineHeight: 1.2 }}>{formatDate(trip.returnDate, trip.returnDay)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', fontFamily: 'monospace', marginTop: 2 }}>{trip.returnRoute}</div>
+                    {trip.returnTime && (
+                      <div style={{ fontSize: 18, fontWeight: 900, color: '#111', fontFamily: 'monospace', marginTop: 6, lineHeight: 1 }}>{trip.returnTime}</div>
+                    )}
+                    {trip.returnTime && (
+                      <div style={{ marginTop: 8, background: '#ECFDF5', borderRadius: 8, padding: '5px 8px', fontSize: 9, fontWeight: 700, color: '#065F46' }}>
+                        🚗 Pick up at {addMinutes(trip.returnTime, 40)}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 9, color: '#9CA3AF', fontStyle: 'italic' }}>Returns next month</span>
+                  </div>
+                )}
+
               </div>
             </div>
-          )}
-
-          {/* Pick-ups */}
-          {pickups.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 8, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 12 }}>🛬</span>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#059669' }}>
-                  Pick-ups ({pickups.length})
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {pickups.map((ev, i) => (
-                  <div key={i} style={{ border: '1px solid #A7F3D0', borderRadius: 14, overflow: 'hidden' }}>
-                    <div style={{ background: '#ECFDF5', padding: '8px 14px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#065F46' }}>{formatDate(ev.date, ev.day)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>{ev.route}</span>
-                    </div>
-                    <div style={{ background: '#fff', padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 15, fontWeight: 900, color: '#111' }}>{ev.flightNo}</span>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: '#111', fontFamily: 'monospace' }}>Lands {ev.time}</span>
-                      </div>
-                      {ev.time && (
-                        <div style={{ background: '#ECFDF5', borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#065F46' }}>
-                          🚗 Be at KLIA arrival hall by {addMinutes(ev.time, 40)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          ))}
 
           {/* Standby */}
           {standbyDays.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 8, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 12 }}>⏳</span>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#D97706' }}>
-                  Standby ({standbyDays.length} days)
+            <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #FDE68A' }}>
+              <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#D97706', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                  ⏳ Standby · {standbyDays.length} days — keep plans flexible
                 </span>
               </div>
-              <div style={{ background: '#FFFBEB', borderRadius: 12, padding: '10px 14px', border: '1px solid #FDE68A' }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: '#92400E', marginBottom: 8 }}>
-                  ⚠️ May get called to fly anytime. Keep big plans flexible on these days.
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {standbyDays.map((ev, i) => (
-                    <span key={i} style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 800, color: '#92400E', fontFamily: 'monospace' }}>
-                      {formatDate(ev.date)}
-                    </span>
-                  ))}
-                </div>
+              <div style={{ background: '#fff', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {standbyDays.map((d, i) => (
+                  <div key={i} style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: '#92400E' }}>{dom(d.date)}</span>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: '#D97706', textTransform: 'uppercase' }}>{d.day?.slice(0, 3)}</span>
+                    {d.dutyStart && (
+                      <span style={{ fontSize: 8, fontFamily: 'monospace', color: '#B45309' }}>{d.dutyStart}{d.dutyEnd ? `–${d.dutyEnd}` : ''}</span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* Free days */}
           {freeDays.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 8, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 12 }}>🏡</span>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#16A34A' }}>
-                  Free Days ({freeDays.length})
+            <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #BBF7D0' }}>
+              <div style={{ background: '#F0FDF4', borderBottom: '1px solid #BBF7D0', padding: '6px 12px' }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#16A34A', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                  🏡 Free Days · {freeDays.length} — plan something together ✨
                 </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {freeDays.map((ev, i) => (
-                  <div key={i} style={{
-                    background: '#F0FDF4',
-                    border: '1px solid #BBF7D0',
-                    borderRadius: 10,
-                    padding: '6px 10px',
-                    textAlign: 'center',
-                    minWidth: 48,
-                  }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: '#15803D', lineHeight: 1 }}>{dom(ev.date)}</div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#16A34A', letterSpacing: '0.1em' }}>{ev.day?.slice(0, 3) ?? ''}</div>
+              <div style={{ background: '#fff', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {freeDays.map((d, i) => (
+                  <div key={i} style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '5px 9px', textAlign: 'center', minWidth: 36 }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: '#15803D', lineHeight: 1 }}>{dom(d.date)}</div>
+                    <div style={{ fontSize: 7, fontWeight: 700, color: '#16A34A', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{d.day?.slice(0, 3)}</div>
                   </div>
                 ))}
               </div>
@@ -401,60 +517,45 @@ const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(
         </div>
 
         {/* Footer */}
-        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F7F5F0' }}>
-          <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#B0ABA5', fontFamily: 'monospace' }}>
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F7F5F0' }}>
+          <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#B0ABA5', fontFamily: 'monospace' }}>
             cemrosta.io
           </span>
-          <span style={{ fontSize: 9, color: '#B0ABA5', fontWeight: 600 }}>
+          <span style={{ fontSize: 8, color: '#B0ABA5', fontWeight: 600 }}>
             Generated from official iFlight roster
           </span>
         </div>
       </div>
     );
-  }
+  },
 );
 PrintCard.displayName = 'PrintCard';
 
 // ── Main component ────────────────────────────────────────────────────────────
-
-type TabId = 'sendoffs' | 'pickups' | 'standby' | 'off';
 
 export function FamilyCard() {
   const { activeRoster } = useRoster();
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>('sendoffs');
 
   if (!activeRoster) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="w-12 h-12 rounded-2xl bg-surface-2 flex items-center justify-center mb-4">
           <Plane size={20} className="text-text-subtle" />
         </div>
-        <p className="text-text-muted font-bold text-sm">Upload a roster to generate your Family Card</p>
+        <p className="text-text-muted font-bold text-sm">Upload a roster to generate your Family Hub</p>
       </div>
     );
   }
 
-  const events = activeRoster.events ?? [];
-  const allEvents = deriveEvents(events);
-  const sendoffs    = allEvents.filter(e => e.kind === 'sendoff');
-  const pickups     = allEvents.filter(e => e.kind === 'pickup');
-  const standbyDays = allEvents.filter(e => e.kind === 'standby');
-  const freeDays    = allEvents.filter(e => e.kind === 'off');
+  const { trips, standbyDays, freeDays } = deriveFamily(activeRoster.events ?? []);
 
   const crewName   = activeRoster.crewName ?? 'Crew Member';
   const month      = activeRoster.month ?? '';
   const year       = activeRoster.year ?? '';
   const monthLabel = MONTH_NAMES[month] ?? month;
-
-  const tabs: { id: TabId; label: string; icon: string; count: number }[] = [
-    { id: 'sendoffs', label: 'Send-offs',  icon: '🛫', count: sendoffs.length },
-    { id: 'pickups',  label: 'Pick-ups',   icon: '🛬', count: pickups.length },
-    { id: 'standby',  label: 'Standby',    icon: '⏳', count: standbyDays.length },
-    { id: 'off',      label: 'Free Days',  icon: '🏡', count: freeDays.length },
-  ];
 
   const handleDownload = useCallback(async () => {
     if (!cardRef.current || isDownloading) return;
@@ -475,16 +576,15 @@ export function FamilyCard() {
   const handleShare = useCallback(async () => {
     if (!cardRef.current) return;
     try {
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true });
       if (navigator.share) {
-        const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true });
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], `cemrosta-family-${month.toLowerCase()}.png`, { type: 'image/png' });
+        const blob  = await (await fetch(dataUrl)).blob();
+        const file  = new File([blob], `cemrosta-family-${month.toLowerCase()}.png`, { type: 'image/png' });
         if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ files: [file], title: `${crewName} · ${monthLabel} Schedule` });
           return;
         }
       }
-      // Fallback: copy image URL to clipboard
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -493,146 +593,112 @@ export function FamilyCard() {
     }
   }, [crewName, month, monthLabel]);
 
-  const tabContent = {
-    sendoffs: sendoffs.length > 0
-      ? <div className="space-y-3">{sendoffs.map((ev, i) => <SendOffCard key={i} ev={ev} />)}</div>
-      : <Empty label="No send-offs this month" />,
-    pickups: pickups.length > 0
-      ? <div className="space-y-3">{pickups.map((ev, i) => <PickUpCard key={i} ev={ev} />)}</div>
-      : <Empty label="No pick-ups this month" />,
-    standby: standbyDays.length > 0
-      ? (
-        <div className="space-y-2">
-          <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-amber-50 border border-amber-100 mb-3">
-            <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
-            <p className="text-[12px] font-bold text-amber-800 leading-snug">
-              May get called to fly anytime during standby windows. Avoid committing to big plans on these days.
-            </p>
-          </div>
-          {standbyDays.map((ev, i) => <StandbyCard key={i} ev={ev} />)}
-        </div>
-      )
-      : <Empty label="No standby days this month" />,
-    off: freeDays.length > 0
-      ? (
-        <div>
-          <p className="text-[12px] font-bold text-text-muted mb-3">
-            {freeDays.length} free days — plan something together ✨
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            {freeDays.map((ev, i) => (
-              <div key={i} className="rounded-2xl bg-green-50 border border-green-100 p-3 text-center">
-                <div className="text-[20px] font-black text-green-800 leading-none">{dom(ev.date)}</div>
-                <div className="text-[10px] font-bold text-green-600 mt-0.5">
-                  {ev.day?.slice(0, 3) ?? ''}
-                </div>
-                {ev.description && ev.description !== 'Day Off' && ev.description !== 'Earned Day Off' && (
-                  <div className="text-[9px] font-black text-green-500 mt-0.5 uppercase tracking-wider">
-                    {ev.description.split(' ')[0]}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )
-      : <Empty label="No free days found" />,
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
-      {/* Hidden printable card — captured by html-to-image */}
+      {/* Hidden printable card */}
       <div className="absolute -left-[9999px] top-0 pointer-events-none" aria-hidden>
         <PrintCard
           ref={cardRef}
           crewName={crewName}
           month={month}
           year={year}
-          sendoffs={sendoffs}
-          pickups={pickups}
-          freeDays={freeDays}
+          trips={trips}
           standbyDays={standbyDays}
+          freeDays={freeDays}
         />
       </div>
 
       {/* Card header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-1">
+          <div className="text-[9px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-1">
             Family Hub
           </div>
           <h2 className="text-2xl font-black tracking-tighter text-text leading-none">
             {monthLabel} {year}
           </h2>
-          <p className="text-[13px] text-text-muted font-bold mt-1">{crewName}</p>
+          <p className="text-[12px] text-text-muted font-bold mt-1">{crewName}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-border text-[12px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-border text-[11px] font-black text-text-muted hover:text-text hover:border-text-subtle transition-all"
           >
-            {copied ? <Check size={13} className="text-green-500" /> : <Share2 size={13} />}
+            {copied ? <Check size={12} className="text-green-500" /> : <Share2 size={12} />}
             {copied ? 'Copied!' : 'Share'}
           </button>
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent text-accent-fg text-[12px] font-black shadow-lg shadow-accent/20 hover:bg-accent-hover transition-all disabled:opacity-60"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent text-accent-fg text-[11px] font-black shadow-lg shadow-accent/20 hover:bg-accent-hover transition-all disabled:opacity-60"
           >
-            <Download size={13} />
+            <Download size={12} />
             {isDownloading ? 'Saving…' : 'Download Card'}
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-black border transition-all ${
-              activeTab === tab.id
-                ? 'bg-accent text-accent-fg border-accent shadow-md shadow-accent/20'
-                : 'bg-white border-border text-text-muted hover:border-text-subtle'
-            }`}
-          >
-            <span>{tab.icon}</span>
-            {tab.label}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
-              activeTab === tab.id ? 'bg-white/20' : 'bg-surface-2'
-            }`}>
-              {tab.count}
-            </span>
-          </button>
+      {/* Stats strip */}
+      <div className="flex gap-3 flex-wrap">
+        {[
+          { label: 'Rotations', value: trips.length, color: 'text-sky-600 bg-sky-50 border-sky-100' },
+          { label: 'Standby', value: standbyDays.length, color: 'text-amber-600 bg-amber-50 border-amber-100' },
+          { label: 'Free Days', value: freeDays.length, color: 'text-green-600 bg-green-50 border-green-100' },
+        ].map(s => (
+          <div key={s.label} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[11px] font-black ${s.color}`}>
+            <span className="text-[15px] font-black leading-none">{s.value}</span>
+            <span className="opacity-70">{s.label}</span>
+          </div>
         ))}
       </div>
 
-      {/* Tab content */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2 }}
-        >
-          {tabContent[activeTab]}
-        </motion.div>
-      </AnimatePresence>
+      {/* Trips */}
+      {trips.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-subtle font-mono">Rotations</span>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+          <AnimatePresence>
+            {trips.map((trip, i) => (
+              <motion.div
+                key={trip.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <TripTile trip={trip} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      ) : (
+        <Empty label="No flights departing or arriving base this month" />
+      )}
 
-    </div>
-  );
-}
+      {/* Standby */}
+      {standbyDays.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-subtle font-mono">Standby</span>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+          <StandbySection days={standbyDays} />
+        </div>
+      )}
 
-function Empty({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="w-10 h-10 rounded-2xl bg-surface-2 flex items-center justify-center mb-3">
-        <Check size={16} className="text-text-subtle" />
-      </div>
-      <p className="text-[13px] text-text-muted font-bold">{label}</p>
+      {/* Free days */}
+      {freeDays.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-subtle font-mono">Free Days</span>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+          <FreeDaysSection days={freeDays} />
+        </div>
+      )}
+
     </div>
   );
 }
