@@ -60,6 +60,7 @@ export interface Duty {
   legs?: number;
   crewStatus?: string;
   pairingActivity?: string;
+  description?: string;  // human-readable label from parser (e.g. "A330 Simulator — OPC Session 31")
 }
 
 // ── Adapter: DutyEvent[] → Duty ──────────────────────────────────────────────
@@ -152,6 +153,7 @@ export function dayEventsToDuty(date: string, dom: number, events: DutyEvent[]):
     endTime,
     from,
     crewStatus,
+    description: primaryEvent.description,
     legs: 0,
   };
 }
@@ -171,7 +173,7 @@ const STATUS_META: Record<DutyStatus, {
   off:      { band: 'bg-green-50 text-green-700',    label: 'Off',     chipTone: 'green'  },
   medical:  { band: 'bg-red-50 text-red-900',        label: 'Medical', chipTone: 'maroon' },
   annual:   { band: 'bg-red-50 text-red-900',        label: 'Leave',   chipTone: 'maroon' },
-  training: { band: 'bg-teal-50 text-teal-700',      label: 'Train',   chipTone: 'teal'   },
+  training: { band: 'bg-teal-50 text-teal-700',      label: 'Sim',     chipTone: 'teal'   },
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -265,7 +267,7 @@ function FlightRows({ f, compact }: { f: TileFlight; compact: boolean }) {
 function restLabel(d: Duty): string {
   switch (d.status) {
     case 'standby':  return `Standby · ${d.from ?? 'KUL'}`;
-    case 'training': return 'Training · ground';
+    case 'training': return d.description ?? 'Simulator';
     case 'office':   return `Office · ${d.from ?? 'KUL'}`;
     case 'annual':   return 'Annual leave';
     case 'medical':  return 'Medical leave';

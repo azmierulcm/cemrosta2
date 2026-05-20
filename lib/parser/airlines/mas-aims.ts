@@ -387,6 +387,36 @@ function parseDayChunk(
     return duties;
   }
 
+  // ── 2b. Early continuation check (must run BEFORE training) ─────────────
+  // The last date block in the PDF extends to end of text and includes the
+  // code-legend section (e.g. "330BLP35 A330 LPC DAY-3 SESSION-5"), which
+  // contains training keywords that would trigger the training step falsely.
+  // A genuine continuation row starts with an airport code immediately after
+  // the optional day-of-week — there is NO duty-start time before the port.
+  // Anchoring to the start of the chunk catches only true continuation rows.
+  const contEarlyRe = /^\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*([A-Z]{3})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})/;
+  const contEarlyM  = chunk.match(contEarlyRe);
+  if (contEarlyM && !NON_PORT.has(contEarlyM[1])) {
+    duties.push({
+      id:              `CONT-${dateISO}`,
+      type:            'FLIGHT',
+      date:            dateISO,
+      day,
+      item:            '__continuation__',
+      signOff:         contEarlyM[3],
+      _isContinuation: true,
+      flight: {
+        flightNumber: '',
+        depPort:      '',
+        arrPort:      contEarlyM[1],
+        std:          '00:00',
+        sta:          contEarlyM[2],
+        signOff:      contEarlyM[3],
+      },
+    });
+    return duties;
+  }
+
   // ── 3. Training / simulator ──────────────────────────────────────────────
   // Short standard codes (including TDC course codes e.g. TDC2)
   const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG|TDC\d*)\b/i;
