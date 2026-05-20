@@ -18,6 +18,7 @@ import type { Listing, ListingStatus } from '@/lib/types/marketplace';
 import { CATEGORY_LABELS, CONDITION_LABELS } from '@/lib/types/marketplace';
 
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+console.log('[admin] ADMIN_EMAILS:', ADMIN_EMAILS, '| raw env:', process.env.NEXT_PUBLIC_ADMIN_EMAILS);
 
 type Tab = 'overview' | 'listings' | 'users';
 
@@ -29,6 +30,7 @@ export default function AdminClient() {
   const [tab, setTab] = useState<Tab>('overview');
 
   const isAdmin = !isLoading && !!user?.email && ADMIN_EMAILS.includes(user.email);
+  console.log('[admin] user.email:', user?.email, '| isLoading:', isLoading, '| isAdmin:', isAdmin);
 
   useEffect(() => {
     if (!isLoading && !isAdmin) router.replace('/');
