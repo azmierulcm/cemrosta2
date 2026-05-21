@@ -19,11 +19,11 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   isAuthModalOpen: boolean
-  authView: 'login' | 'signup'
+  authView: 'login' | 'signup' | 'reset'
   setProfile: (profile: Profile | null) => void
   openAuthModal: (view?: 'login' | 'signup') => void
   closeAuthModal: () => void
-  setAuthView: (view: 'login' | 'signup') => void
+  setAuthView: (view: 'login' | 'signup' | 'reset') => void
   signOutUser: () => Promise<void>
   isLoading: boolean
 }
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  const [authView, setAuthView] = useState<'login' | 'signup'>('signup')
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'reset'>('signup')
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
