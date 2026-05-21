@@ -2,7 +2,7 @@
 
 @theme {
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-plex-mono);
+  --font-mono: var(--font-inter);
 
   /* Surfaces */
   --color-bg: var(--bg);
@@ -179,6 +179,16 @@ body {
     font-weight: 600;
   }
 }
+
+/* ── Leaflet summary map tooltip ─────────────────────────────────────────────── */
+.leaflet-summary-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  white-space: nowrap;
+}
+.leaflet-summary-tooltip::before { display: none !important; }
 
 /* ── RosterTile container queries ──────────────────────────────────────────────
  * Applied via .tile-cq on the root <article> element.

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import Script from "next/script";
 import "../styles/globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
@@ -16,15 +16,6 @@ const inter = Inter({
   preload: true,
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  // Only bold is used (eyebrow labels, code chips). Dropping 400 + 500
-  // saves ~40 KB of font data with no visible difference.
-  weight: ["700"],
-  display: "swap",
-  preload: true,
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -77,7 +68,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
       <head>
         {/* Preconnect to external origins used at runtime */}

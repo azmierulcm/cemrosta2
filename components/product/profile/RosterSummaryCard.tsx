@@ -6,20 +6,13 @@ import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import type { EarnedDestination } from '@/lib/actions/destinations';
 import type { RosterSummary } from '@/lib/types/roster';
+import { TopDestinations, earnedToTopDest } from '@/components/product/TopDestinations';
 
-// Dynamically import react-simple-maps so it doesn't bloat the initial bundle
-const ComposableMap = dynamic(() => import('react-simple-maps').then((m) => m.ComposableMap), { ssr: false });
-const Geographies   = dynamic(() => import('react-simple-maps').then((m) => m.Geographies),   { ssr: false });
-const Geography     = dynamic(() => import('react-simple-maps').then((m) => m.Geography),     { ssr: false });
-const ZoomableGroup = dynamic(() => import('react-simple-maps').then((m) => m.ZoomableGroup), { ssr: false });
-const Line          = dynamic(() => import('react-simple-maps').then((m) => m.Line),          { ssr: false });
-const Marker        = dynamic(() => import('react-simple-maps').then((m) => m.Marker),        { ssr: false });
+const SummaryMapLeaflet = dynamic(() => import('./SummaryMapLeaflet'), { ssr: false });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RosterSummaryCard — visual language matches LiveRosterCard exactly
 // ─────────────────────────────────────────────────────────────────────────────
-
-const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
 // ── IATA metadata ─────────────────────────────────────────────────────────────
 
@@ -293,11 +286,6 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
   const delta    = deltaPercent(stats.totalKm, stats.prevKm);
   const positive = (delta ?? 0) >= 0;
 
-  const topDests = useMemo(
-    () => earnedDestinations.filter((d) => !d.isHome).slice(0, 5),
-    [earnedDestinations],
-  );
-
   if (!rosters.length) return null;
 
   return (
@@ -434,55 +422,14 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
         <div className="flex flex-col">
 
           {/* Map */}
-          <div className="flex-1 overflow-hidden border-b border-border"
-               style={{ background: 'var(--surface)' }}>
-            <SummaryMap mapCoords={stats.mapCoords} topRoute={stats.topRoute} />
+          <div className="flex-1 overflow-hidden border-b border-border" style={{ minHeight: 300 }}>
+            <SummaryMapLeaflet mapCoords={stats.mapCoords} topRoute={stats.topRoute} />
           </div>
 
           {/* Top destinations */}
-          {topDests.length > 0 && (
-            <div className="p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono mb-3">
-                Top Destinations
-              </p>
-              <ul className="space-y-1.5">
-                {topDests.map((d, i) => {
-                  const meta = IATA_META[d.iata];
-                  const city = meta?.city ?? d.iata;
-                  const emoji = meta ? flagEmoji(meta.cc) : '';
-                  return (
-                    <li
-                      key={d.iata}
-                      className="flex items-center justify-between rounded-[var(--radius-lg)] border border-border px-3 py-2.5 transition-colors hover:bg-surface"
-                      style={{ background: 'var(--surface)' }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-accent-fg shrink-0"
-                          style={{ background: 'var(--accent)' }}
-                        >
-                          {i + 1}
-                        </span>
-                        <div className="leading-tight">
-                          <p className="text-[13px] font-black text-text tracking-tight">
-                            {emoji} {d.iata}
-                            <span className="text-[11px] font-bold text-text-muted ml-1.5">{city}</span>
-                          </p>
-                          <p className="text-[10px] font-bold text-text-muted">{d.visits}×</p>
-                        </div>
-                      </div>
-                      {d.isNew && (
-                        <span
-                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-accent-fg"
-                          style={{ background: 'var(--accent)' }}
-                        >
-                          New
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+          {earnedDestinations.length > 0 && (
+            <div className="p-4 border-t border-border">
+              <TopDestinations destinations={earnedToTopDest(earnedDestinations)} />
             </div>
           )}
         </div>
@@ -522,132 +469,3 @@ function SmallStat({ icon, value, label }: { icon: string; value: string; label:
 
 // ── react-simple-maps world map with zoom/pan ─────────────────────────────────
 
-function SummaryMap({
-  mapCoords,
-  topRoute,
-}: {
-  mapCoords: { code: string; coords: [number, number] }[];
-  topRoute: { from: string; to: string; count: number } | null;
-}) {
-  const [zoom, setZoom]     = React.useState(1);
-  const [center, setCenter] = React.useState<[number, number]>([0, 0]);
-
-  const kulCoords     = IATA_COORDS['KUL'];
-  const dests         = mapCoords.filter((p) => p.code !== 'KUL');
-  const topDestCoords = topRoute
-    ? mapCoords.find((p) => p.code === topRoute.to)?.coords ?? null
-    : null;
-
-  // Zoom keeping current pan position
-  const zoomIn  = () => setZoom((z) => Math.min(z * 1.5, 12));
-  const zoomOut = () => setZoom((z) => Math.max(z / 1.5, 1));
-
-  return (
-    <div className="relative w-full h-full" style={{ minHeight: 300 }}>
-      {/* Zoom controls */}
-      <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
-        <button
-          onClick={zoomIn}
-          className="w-7 h-7 rounded-lg border border-border bg-bg text-text-muted hover:text-text hover:bg-surface flex items-center justify-center text-[14px] font-black transition-colors shadow-sm"
-          aria-label="Zoom in"
-        >+</button>
-        <button
-          onClick={zoomOut}
-          className="w-7 h-7 rounded-lg border border-border bg-bg text-text-muted hover:text-text hover:bg-surface flex items-center justify-center text-[14px] font-black transition-colors shadow-sm"
-          aria-label="Zoom out"
-        >−</button>
-      </div>
-
-      {/* Hint */}
-      <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-bold text-text-subtle pointer-events-none select-none z-10">
-        Scroll to zoom · Drag to pan
-      </p>
-
-      <ComposableMap
-        projectionConfig={{ rotate: [-90, -5, 0], scale: 320 }}
-        style={{ width: '100%', height: '100%' }}
-      >
-        <ZoomableGroup
-          zoom={zoom}
-          center={center}
-          onMoveEnd={({ zoom: z, coordinates }) => {
-            setZoom(z);
-            setCenter(coordinates as [number, number]);
-          }}
-        >
-          <Geographies geography={GEO_URL}>
-            {({ geographies }) =>
-              geographies.map((geo) => (
-                <Geography
-                  key={geo.rsmKey}
-                  geography={geo}
-                  style={{
-                    default: { outline: 'none' },
-                    hover:   { outline: 'none' },
-                    pressed: { outline: 'none' },
-                  }}
-                  fill="var(--border)"
-                  stroke="var(--surface)"
-                  strokeWidth={0.5}
-                />
-              ))
-            }
-          </Geographies>
-
-          {/* Dashed arc: KUL → each destination */}
-          {dests.map(({ code, coords }) => (
-            <Line
-              key={code}
-              from={kulCoords}
-              to={coords}
-              stroke="var(--accent)"
-              strokeWidth={code === topRoute?.to ? 1.8 : 1}
-              strokeLinecap="round"
-              strokeDasharray={code === topRoute?.to ? '4 6' : '2 8'}
-              style={{ opacity: code === topRoute?.to ? 0.8 : 0.35 }}
-            />
-          ))}
-
-          {/* Destination markers */}
-          {dests.map(({ code, coords }) => {
-            const isTop = code === topRoute?.to;
-            return (
-              <Marker key={code} coordinates={coords}>
-                <circle r={isTop ? 7 : 5} fill="var(--accent)" opacity={0.18} />
-                <circle r={isTop ? 4 : 3} fill="var(--accent)" stroke="white" strokeWidth={isTop ? 1.5 : 1} />
-                {isTop && (
-                  <text textAnchor="middle" y={-8}
-                        style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
-                    {code}
-                  </text>
-                )}
-              </Marker>
-            );
-          })}
-
-          {/* KUL home marker */}
-          {kulCoords && (
-            <Marker coordinates={kulCoords}>
-              <circle r={10} fill="var(--accent)" opacity={0.18} />
-              <circle r={6}  fill="var(--accent)" stroke="white" strokeWidth={2} />
-              <text textAnchor="middle" y={-10}
-                    style={{ fontSize: '8px', fontWeight: 800, fill: 'var(--accent)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
-                KUL
-              </text>
-            </Marker>
-          )}
-
-          {/* Top dest label */}
-          {topDestCoords && topRoute && (
-            <Marker coordinates={topDestCoords}>
-              <text textAnchor="middle" y={-10}
-                    style={{ fontSize: '7px', fontWeight: 700, fill: 'var(--text)', pointerEvents: 'none', fontFamily: 'ui-monospace, monospace' }}>
-                {topRoute.to}
-              </text>
-            </Marker>
-          )}
-        </ZoomableGroup>
-      </ComposableMap>
-    </div>
-  );
-}
