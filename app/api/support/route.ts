@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     if (apiKey) {
       const resend = new Resend(apiKey);
       await resend.emails.send({
-        from:    'Otarosta Support <onboarding@resend.dev>',
+        from:    'Otarosta Support <support@otarosta.com>',
         to:      SUPPORT_EMAIL,
         subject: `[Otarosta] Bug Report — ${safeCategory} (${reportId})`,
         html: `
