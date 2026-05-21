@@ -58,7 +58,7 @@ export const Footer = () => {
             <ul className="space-y-4">
               <li className="flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-success shadow-[0_0_10px_rgba(0,138,5,0.3)]" />
-                <span className="text-sm font-bold text-text">MAS AIMS</span>
+                <span className="text-sm font-bold text-text">MAS</span>
               </li>
               <li className="flex items-center gap-3 opacity-40">
                 <span className="w-2 h-2 rounded-full bg-text-subtle" />

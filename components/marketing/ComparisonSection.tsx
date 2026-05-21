@@ -442,7 +442,7 @@ export const ComparisonSection = () => {
             Three things. One upload.
           </h2>
           <p className="text-[16px] md:text-[17px] text-text-muted font-bold max-w-xl leading-snug tracking-tight">
-            Drop your AIMS PDF and walk away with a synced calendar, a lifetime destination passport, and a monthly recap card worth sharing.
+            Drop your Roster PDF and walk away with a synced calendar, a lifetime destination passport, and a monthly recap card worth sharing.
           </p>
         </motion.div>
 

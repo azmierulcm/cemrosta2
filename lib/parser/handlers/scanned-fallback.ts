@@ -50,7 +50,7 @@ export function scannedFallbackHandler(text: string, logger: ParseLogger): never
 
   throw new Error(
     'This PDF appears to be a scanned image rather than a digital text document. ' +
-    'Please export your roster directly from the AIMS portal as a PDF — ' +
+    'Please export your roster directly from the portal as a PDF — ' +
     'do not scan a printed copy.',
   );
 }

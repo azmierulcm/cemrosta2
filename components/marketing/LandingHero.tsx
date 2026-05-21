@@ -35,7 +35,7 @@ const PASSPORT_PATCHES = [
 ];
 
 const FORMAT_PILLS = [
-  { name: 'MAS AIMS', status: 'live' },
+  { name: 'MAS', status: 'live' },
   { name: 'AirAsia',  status: 'soon' },
   { name: 'Batik Air',status: 'soon' },
   { name: 'SIA',      status: 'soon' },
@@ -285,7 +285,7 @@ export const LandingHero = () => {
               {[
                 [CheckCircle2, 'Free forever'],
                 [Zap,          'No credit card'],
-                [ShieldCheck,  'Works with MAS AIMS'],
+                [ShieldCheck,  'Works with MAS'],
                 [Heart,        "Your data stays yours — we're not your airline's IT dept"],
               ].map(([Icon, label]) => (
                 <div key={label as string} className="flex items-center gap-2">

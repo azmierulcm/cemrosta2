@@ -54,7 +54,7 @@ export function parseRosterText(text: string, logger?: ParseLogger): ParsedRoste
   });
 
   throw new UnsupportedAirlineError(
-    'This roster format is not yet supported. Currently only MAS AIMS rosters are accepted.',
+    'This roster format is not yet supported. Currently only Malaysia Airlines (MAS) roster PDFs are accepted.',
   );
 }
 

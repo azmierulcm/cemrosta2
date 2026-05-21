@@ -12,7 +12,7 @@ function UploadPreview() {
         <Upload size={24} className="text-accent" />
       </div>
       <div>
-        <p className="text-[13px] font-black text-text mb-1">Drop your AIMS PDF here</p>
+        <p className="text-[13px] font-black text-text mb-1">Drop your Roster PDF here</p>
         <p className="text-[11px] text-text-muted font-bold">or click to browse</p>
       </div>
       {/* Fake progress bar */}
@@ -123,7 +123,7 @@ const STEPS = [
   {
     n: '01',
     title: 'Drop your roster',
-    desc:  'Drag your AIMS PDF in. We extract every flight, standby, and rest day instantly — no manual entry.',
+    desc:  'Drag your Roster PDF in. We extract every flight, standby, and rest day instantly — no manual entry.',
     preview: <UploadPreview />,
   },
   {

@@ -50,13 +50,13 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
       return msg;
     }
     if (lower.includes('no dates found')) {
-      return 'No dates were found in this PDF. Make sure it is an AIMS roster — not a scanned image or a different format.';
+      return 'No dates were found in this PDF. Make sure it is a Roster PDF — not a scanned image or a different format.';
     }
     if (lower.includes('not a pdf') || lower.includes('invalid pdf') || lower.includes('unsupported')) {
-      return 'This file isn\'t a valid PDF. Please export your AIMS roster as a PDF and try again.';
+      return 'This file isn\'t a valid PDF. Please export your roster as a PDF and try again.';
     }
     if (lower.includes('no flights') || lower.includes('no events') || lower.includes('could not parse') || lower.includes('empty')) {
-      return 'No flights found in this PDF. Make sure it\'s an AIMS roster, not a scanned image.';
+      return 'No flights found in this PDF. Make sure it\'s a Roster PDF, not a scanned image.';
     }
     if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch')) {
       return 'Network error — check your connection and try again.';
@@ -76,7 +76,7 @@ export const FileUploader = ({ onSuccess }: FileUploaderProps) => {
 
   const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: import('react-dropzone').FileRejection[]) => {
     if (rejectedFiles.length > 0) {
-      setError('Only PDF files are supported. Please export your AIMS roster as a PDF.');
+      setError('Only PDF files are supported. Please export your roster as a PDF.');
       return;
     }
 

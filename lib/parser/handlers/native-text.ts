@@ -126,7 +126,7 @@ export async function nativeTextHandler(
     logger.error('native-text', 'Every page returned empty text', { emptyPages });
     throw new Error(
       'No text could be extracted from any page of this PDF. ' +
-      'Please ensure this is a text-based roster exported directly from AIMS, not a scanned image.',
+      'Please ensure this is a text-based PDF exported directly from the portal, not a scanned image.',
     );
   }
 

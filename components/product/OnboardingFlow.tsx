@@ -179,7 +179,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   Hey, {firstName}.
                 </h1>
                 <p className="text-[16px] font-bold text-text-muted leading-snug">
-                  Here&apos;s what happens when you upload<br className="hidden sm:block" /> your AIMS roster PDF.
+                  Here&apos;s what happens when you upload<br className="hidden sm:block" /> your Roster PDF.
                 </p>
               </div>
 
@@ -355,7 +355,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   {'// STEP 2 OF 2 — YOUR ROSTER'}
                 </p>
                 <h2 className="text-4xl font-black tracking-tighter text-text leading-tight">
-                  Drop your AIMS PDF.
+                  Drop your Roster PDF.
                 </h2>
                 <p className="text-[14px] font-bold text-text-muted leading-snug">
                   Use your current or most recent monthly roster.
@@ -365,7 +365,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
               {/* Tip chips */}
               <div className="flex flex-wrap gap-2">
-                {['PDF only', 'MAS AIMS format', 'Max 10 MB', 'Data never shared'].map((tip) => (
+                {['PDF only', 'MAS format', 'Max 10 MB', 'Data never shared'].map((tip) => (
                   <span
                     key={tip}
                     className="px-3 py-1 rounded-full bg-surface-2 border border-border text-[11px] font-black text-text-muted"

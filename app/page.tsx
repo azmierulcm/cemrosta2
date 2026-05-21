@@ -4,14 +4,14 @@ import HomeClient from "./HomeClient";
 export const metadata: Metadata = {
   title: "Otarosta — Your roster, transformed.",
   description:
-    "Otarosta converts your AIMS roster PDF into a synced calendar, destination passport, and monthly recap card. Free forever for MAS crew.",
+    "Otarosta converts your roster PDF into a synced calendar, destination passport, and monthly recap card. Free forever for MAS crew.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Otarosta — Your roster, transformed.",
     description:
-      "Drop your AIMS PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
+      "Drop your Roster PDF. Get a synced calendar, lifetime destination passport, and proof your schedule exists — for your family. Free forever.",
     images: [{ url: "/api/og/home", width: 1200, height: 630, alt: "Otarosta — Your roster, transformed." }],
   },
 };

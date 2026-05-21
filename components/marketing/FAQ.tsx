@@ -19,7 +19,7 @@ const FAQS = [
   },
   {
     q: 'Which airlines are supported?',
-    a: 'MAS AIMS is fully supported now. AirAsia, Batik Air, and SIA are coming soon — drop your email in the waitlist section to get notified the moment your airline goes live.',
+    a: 'Malaysia Airlines (MAS) is fully supported now. AirAsia, Batik Air, and SIA are coming soon — drop your email in the waitlist section to get notified the moment your airline goes live.',
   },
 ];
 

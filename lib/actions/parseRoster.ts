@@ -86,7 +86,7 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
       buffer[2] !== 0x44 || // D
       buffer[3] !== 0x46    // F
     ) {
-      throw new Error('Not a valid PDF file. Please export your AIMS roster as a PDF and try again.');
+      throw new Error('Not a valid PDF file. Please export your roster as a PDF and try again.');
     }
     const extraction = await nativeTextHandler(buffer, logger);
 
@@ -178,7 +178,7 @@ export async function parseRosterPreview(formData: FormData): Promise<RosterData
       parsed,
     });
 
-    throw new Error('No duties were found. Make sure this is an AIMS roster PDF.');
+    throw new Error('No duties were found. Make sure this is a Roster PDF.');
   }
 
   // ── Stage 4: Enrichment ───────────────────────────────────────────────────
