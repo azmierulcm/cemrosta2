@@ -32,7 +32,10 @@ export default function ModerationClient() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && isAdmin) fetchQueue();
+    if (!isLoading && isAdmin) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchQueue();
+    }
   }, [isLoading, isAdmin, fetchQueue]);
 
   useEffect(() => {

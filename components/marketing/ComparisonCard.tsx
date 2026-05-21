@@ -10,7 +10,7 @@ interface ComparisonCardProps {
   content: string;
 }
 
-const ComparisonCard = ({ type, title, content }: ComparisonCardProps) => {
+const ComparisonCard = ({ type, content }: ComparisonCardProps) => {
   const isOld = type === 'old';
   return (
     <motion.div

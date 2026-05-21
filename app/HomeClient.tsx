@@ -112,7 +112,8 @@ export default function HomeClient() {
   useEffect(() => {
     if (!user) return;
     const seen = localStorage.getItem(`cemrosta-ob-${user.uid}`) === '1';
-    if (seen) setShowOnboarding(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowOnboarding(!seen);
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wait for both the roster list AND the active roster fetch before showing content.

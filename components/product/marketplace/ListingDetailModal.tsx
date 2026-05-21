@@ -99,9 +99,10 @@ export const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: List
 
             {/* Left: Image Carousel */}
             <div className="w-full md:w-3/5 bg-surface-2 relative group h-1/3 md:h-full">
-              <img 
-                src={images[currentImg]} 
-                alt={listing.title} 
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images[currentImg]}
+                alt={listing.title}
                 className="w-full h-full object-cover"
               />
               
@@ -178,10 +179,11 @@ export const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: List
                  {/* Seller Card */}
                  <div className="bg-surface-2 p-6 rounded-[2rem] border border-border flex items-center gap-5 group transition-all hover:bg-white hover:shadow-xl hover:shadow-black/5">
                     <div className="w-16 h-16 rounded-2xl bg-white border border-border overflow-hidden relative shadow-sm">
-                       <img 
-                         src={listing.profiles?.avatar_url || `https://i.pravatar.cc/150?u=${listing.seller_id}`} 
-                         alt="Seller" 
-                         className="w-full h-full object-cover" 
+                       {/* eslint-disable-next-line @next/next/no-img-element */}
+                       <img
+                         src={listing.profiles?.avatar_url || `https://i.pravatar.cc/150?u=${listing.seller_id}`}
+                         alt="Seller"
+                         className="w-full h-full object-cover"
                        />
                     </div>
                     <div className="flex-1">

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Share2, Download, Copy, Eye, Layout, Smartphone, Monitor } from 'lucide-react';
+import { X, Share2, Download, Copy, Layout, Smartphone, Monitor } from 'lucide-react';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -69,9 +69,10 @@ const ShareModal = ({ isOpen, onClose, crewId }: ShareModalProps) => {
                 relative shadow-2xl transition-all duration-500 overflow-hidden rounded-xl border border-white/10
                 ${format === 'story' ? 'aspect-[9/16] h-full' : format === 'feed' ? 'aspect-[4/5] h-[90%]' : 'aspect-[16/9] w-full'}
             `}>
-                <img 
-                  src={imageUrl} 
-                  alt="Passport Card Preview" 
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt="Passport Card Preview"
                   className="w-full h-full object-cover"
                 />
             </div>

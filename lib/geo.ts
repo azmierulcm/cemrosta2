@@ -1,4 +1,3 @@
-import { DateTime } from 'luxon';
 
 /**
  * Calculates Great Circle distance between two points in Kilometers
@@ -46,7 +45,8 @@ export function computeRouteFlags(lat1: number, lon1: number, lat2: number, lon2
  * Checks if the flight duration spans typical sunrise/sunset times in UTC
  * relative to the geographic position.
  */
-export function checkWitnessedEvents(std: string, sta: string, lon1: number, lon2: number) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function checkWitnessedEvents(_std: string, _sta: string, _lon1: number, _lon2: number) {
   // Simplified version: Check if flight crosses local 6am or 6pm roughly
   // Real implementation would use suncalc or similar library with UTC conversion
   return {

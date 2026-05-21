@@ -37,6 +37,7 @@ export default function MarketplaceClient() {
   }, [category, sort, verifiedOnly]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchListings();
   }, [fetchListings]);
 

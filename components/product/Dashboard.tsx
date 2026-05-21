@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, Clock, MapPin, Hotel, Download, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp } from 'lucide-react';
+import { Plane, Clock, MapPin, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { DutyEvent } from '@/lib/types';
@@ -52,7 +52,6 @@ function EventEditModal({
 }) {
   const { updateEvent } = useRoster();
   const isFlight  = event.type === 'FLIGHT';
-  const isStandby = event.type === 'STANDBY';
 
   const [draft, setDraft]       = useState<DutyEvent>(event);
   const [saving, setSaving]     = useState(false);
@@ -446,10 +445,9 @@ export const Dashboard = () => {
   }, [greetingIndex]);
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Crew';
+  const [exportState, setExportState] = useState<'idle' | 'ok' | 'error'>('idle');
 
   if (!activeRoster) return null;
-
-  const [exportState, setExportState] = useState<'idle' | 'ok' | 'error'>('idle');
 
   const handleExport = () => {
     try {

@@ -71,7 +71,7 @@ function PatchMedallion({
         {patchUrl
           ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={patchUrl} width={imgSize} height={imgSize} style={{ objectFit: 'contain' }} />
+            <img src={patchUrl} alt="" width={imgSize} height={imgSize} style={{ objectFit: 'contain' }} />
           )
           : (
             <div style={{ display: 'flex', width: imgSize, height: imgSize }} />

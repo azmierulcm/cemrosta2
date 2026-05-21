@@ -203,7 +203,6 @@ export function enrichParsedRoster(parsed: ParsedRoster): EnrichedRoster {
   let daysOff           = 0;
   let trainingDays      = 0;
   let standbyDays       = 0;
-  let layoverCount      = 0;
 
   const enrichedDuties: EnrichedDuty[] = parsed.duties.map((duty) => {
     const isLayover = layoverDates.has(duty.date);
@@ -254,7 +253,6 @@ export function enrichParsedRoster(parsed: ParsedRoster): EnrichedRoster {
         totalDutyMinutes  += flightDuty || dutyMinutes;
         totalKm           += distanceKm;
         totalSectors      += 1;
-        if (isLayover) layoverCount++;
 
         const enrichedFlight: EnrichedFlight = {
           ...duty.flight,

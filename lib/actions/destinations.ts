@@ -26,7 +26,7 @@ export async function getLifetimeDestinations(
   const latestIatas = new Set<string>();
 
   for (const doc of snap.docs) {
-    const events: any[] = doc.data().events ?? [];
+    const events: Array<{ type: string; arrPort?: string }> = doc.data().events ?? [];
     const isLatest = doc.id === latestRosterId;
 
     for (const e of events) {

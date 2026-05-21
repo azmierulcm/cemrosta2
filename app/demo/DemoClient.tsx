@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { DESTINATION_CATALOG, REGION_COLORS } from '@/lib/data/destination-catalog';
 import { getPatchImageUrl } from '@/lib/patches/patch-images';
 import { ILLUSTRATIONS } from '@/lib/patches/illustrations';
-import { Lock, Sparkles, Globe, Award, Share2, Download } from 'lucide-react';
+import { Sparkles, Globe, Award, Share2, Download } from 'lucide-react';
 
 /* ── Rarity config ───────────────────────────────────────────────────────── */
 const RARITY = [
@@ -425,13 +426,13 @@ export default function DemoClient() {
               <div className="mt-8 p-6 rounded-[1.5rem] border border-border bg-surface-2">
                 <p className="text-[11px] font-[800] uppercase tracking-widest font-mono text-text-subtle mb-2">Ready to start?</p>
                 <p className="text-[14px] font-[500] text-text-muted mb-4 leading-snug">Upload your roster PDF and your first recap generates automatically.</p>
-                <a
+                <Link
                   href="/"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-[13px] font-[800] transition-all hover:scale-[1.02] active:scale-95"
                   style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
                 >
                   Create free account →
-                </a>
+                </Link>
               </div>
             </div>
           </div>

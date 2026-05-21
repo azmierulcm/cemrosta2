@@ -36,6 +36,7 @@ export default function ProfileClient() {
   // Fetch lifetime destinations whenever the user's roster set changes
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEarnedDestinations(prev => prev.length === 0 ? prev : []);
       return;
     }

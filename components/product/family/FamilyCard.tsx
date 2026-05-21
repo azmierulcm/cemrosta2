@@ -471,20 +471,9 @@ export function FamilyCard() {
   const [downloading, setDownloading] = useState(false);
   const [copied,      setCopied]      = useState(false);
 
-  if (!activeRoster) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20" style={{ background: CREAM }}>
-        <Plane size={24} className="text-text-subtle mb-3" />
-        <p className="text-[13px] font-bold text-text-muted">Upload a roster to generate your Family Hub</p>
-      </div>
-    );
-  }
-
-  const { flightCards, standbyDays, freeDays } = deriveData(activeRoster.events ?? []);
-  const crewName   = activeRoster.crewName ?? 'Crew Member';
-  const firstName  = crewName.split(' ').slice(0, 2).join(' ');
-  const month      = activeRoster.month ?? '';
-  const year       = activeRoster.year  ?? '';
+  const month      = activeRoster?.month ?? '';
+  const year       = activeRoster?.year  ?? '';
+  const crewName   = activeRoster?.crewName ?? 'Crew Member';
   const monthLabel = MONTH_NAMES[month] ?? month;
 
   const capture = useCallback(async () => {
@@ -521,6 +510,18 @@ export function FamilyCard() {
       setTimeout(() => setCopied(false), 2000);
     } catch (e) { console.error(e); }
   }, [capture, crewName, month, monthLabel]);
+
+  if (!activeRoster) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20" style={{ background: CREAM }}>
+        <Plane size={24} className="text-text-subtle mb-3" />
+        <p className="text-[13px] font-bold text-text-muted">Upload a roster to generate your Family Hub</p>
+      </div>
+    );
+  }
+
+  const { flightCards, standbyDays, freeDays } = deriveData(activeRoster.events ?? []);
+  const firstName  = crewName.split(' ').slice(0, 2).join(' ');
 
   return (
     <div style={{ background: CREAM }}>

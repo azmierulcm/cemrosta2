@@ -10,7 +10,7 @@ import { getUserListings } from '@/lib/actions/listings';
 import type { Listing } from '@/lib/types/marketplace';
 import {
   User2, Plane, Building2, MapPin, FileText,
-  Loader2, Check, ChevronDown, ArrowRight, Sparkles, Camera, Trash2,
+  Loader2, Check, ChevronDown, ArrowRight, Camera, Trash2,
   Lock, ShoppingBag, ExternalLink,
 } from 'lucide-react';
 import { FlipWords } from '@/components/shared/FlipWords';
@@ -106,6 +106,7 @@ export default function SettingsClient() {
   // Pre-fill from existing profile
   useEffect(() => {
     if (profile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         full_name: profile.full_name ?? '',
         rank:      profile.rank      ?? '',
@@ -121,6 +122,7 @@ export default function SettingsClient() {
   // Load user's listings
   useEffect(() => {
     if (!user) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setListingsLoading(true);
     getUserListings(user.uid)
       .then(setListings)

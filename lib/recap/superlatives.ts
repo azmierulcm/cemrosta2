@@ -124,6 +124,7 @@ export function getTopSuperlative(
   if (candidates.length === 0) return fallback();
 
   // Return the highest-scoring superlative
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { score: _score, ...best } = candidates.sort((a, b) => b.score - a.score)[0];
   return best;
 }

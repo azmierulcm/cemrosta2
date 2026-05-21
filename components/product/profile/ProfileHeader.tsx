@@ -40,6 +40,7 @@ export function ProfileHeader({
     <div className="bg-bg border border-border rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] p-8 flex items-center gap-5">
       {/* Avatar */}
       {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={avatarUrl}
           alt={displayName}

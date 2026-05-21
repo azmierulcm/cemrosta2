@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Plane, Globe, Award, Calendar, ChevronRight, Play } from 'lucide-react';
-import { CrewStats } from '@/lib/types/passport';
+import { CrewStats, CrewRank, PrivacyMode } from '@/lib/types/passport';
 import ShareModal from './ShareModal';
 import AchievementBadge from './AchievementBadge';
 import { ACHIEVEMENT_CATALOG } from '@/lib/achievements/definitions';
@@ -16,7 +16,7 @@ interface DashboardProps {
   earnedAchievements?: string[];
 }
 
-const StatCard = ({ label, value, sub, icon: Icon }: any) => (
+const StatCard = ({ label, value, sub, icon: Icon }: { label: string; value: string | number; sub?: string; icon: React.ElementType }) => (
   <div className="bg-surface p-8 rounded-[2rem] border border-border hover:border-accent/30 transition-all group shadow-xl">
     <div className="flex justify-between items-start mb-6">
       <div className="w-10 h-10 rounded-xl bg-bg flex items-center justify-center border border-border group-hover:border-accent/20 transition-colors shadow-inner">
@@ -40,7 +40,7 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
     id: 'demo',
     user_id: 'demo',
     display_name: 'Muhammad Azmierul',
-    rank: 'First Officer' as any,
+    rank: 'First Officer' as CrewRank,
     base_iata: 'KUL',
     airline_code: 'MH',
     aircraft_types: ['A350', 'A330'],
@@ -48,7 +48,7 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
     avatar_url: null,
     hire_date: '2020-05-15',
     birthday: null,
-    privacy_mode: 'public' as any,
+    privacy_mode: 'public' as PrivacyMode,
     created_at: new Date().toISOString()
   };
 
@@ -58,7 +58,7 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
         {/* Header Hero */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
           <div>
-            <p className="text-accent font-bold uppercase tracking-[0.5em] text-[10px] mb-4 font-mono">// OFFICIAL DIGITAL PASSPORT</p>
+            <p className="text-accent font-bold uppercase tracking-[0.5em] text-[10px] mb-4 font-mono">{`// OFFICIAL DIGITAL PASSPORT`}</p>
             <h1 className="text-5xl md:text-8xl font-bold tracking-tighter leading-none mb-4">
               Mission <br />
               <span className="text-text-subtle italic font-serif font-light">Summary.</span>
@@ -124,7 +124,7 @@ const PassportDashboard = ({ stats, earnedAchievements = [] }: DashboardProps) =
             {/* Crew Trading Card Feature */}
             <div className="bg-surface/30 rounded-[3rem] p-12 border border-border flex flex-col md:flex-row items-center gap-16 mt-24">
                <div className="scale-75 md:scale-100 origin-center shrink-0">
-                  <CrewCard profile={mockProfile as any} stats={stats} />
+                  <CrewCard profile={mockProfile} stats={stats} />
                </div>
                <div className="flex-1 text-center md:text-left">
                   <h3 className="text-3xl font-bold mb-6 tracking-tight text-text uppercase italic">Your Digital Asset.</h3>

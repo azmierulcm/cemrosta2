@@ -307,7 +307,7 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pt-5 pb-4 border-b border-border">
         <p className="text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono">
-          // Roster Summary
+          {`// Roster Summary`}
         </p>
         <div className="flex items-center gap-0.5 bg-surface rounded-full p-1 border border-border">
           {PERIOD_TABS.map((tab) => {
@@ -492,7 +492,7 @@ export function RosterSummaryCard({ earnedDestinations, onGenerateCard }: Roster
       {onGenerateCard && (
         <div className="flex items-center justify-between px-6 py-4 border-t border-border">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono">
-            // Mission Recap
+            {`// Mission Recap`}
           </p>
           <button
             onClick={onGenerateCard}

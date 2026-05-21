@@ -4,11 +4,11 @@ import React from 'react';
 import { Navbar } from '@/components/shared/Navbar';
 import PublicProfileGallery from '@/components/product/profile/PublicProfileGallery';
 import PublicMissionMap from '@/components/product/profile/PublicMissionMap';
-import { StatsGrid } from '@/components/product/profile/StatsGrid';
 import { DestinationPatch } from '@/components/product/DestinationPatch';
 import { useRoster } from '@/lib/contexts/RosterContext';
 
-export default function PublicProfileClient({ id }: { id: string }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function PublicProfileClient(_props: { id: string }) {
   const { activeRoster: roster, loadSampleRoster } = useRoster();
 
   React.useEffect(() => {

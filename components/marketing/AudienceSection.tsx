@@ -197,7 +197,7 @@ function FamilyVisual() {
             AC
           </div>
           <div>
-            <p className="text-[11px] font-black text-emerald-900 leading-none">Ahmad's Schedule</p>
+            <p className="text-[11px] font-black text-emerald-900 leading-none">Ahmad&apos;s Schedule</p>
             <p className="text-[9px] font-bold text-emerald-600 leading-none mt-0.5">Shared by crew member</p>
           </div>
         </div>
@@ -274,6 +274,7 @@ function CyclingWord() {
   const [showStrike, setShowStrike] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowStrike(false);
     const t1 = setTimeout(() => setShowStrike(true), 2000);
     const t2 = setTimeout(() => setIndex(i => (i + 1) % CYCLING_WORDS.length), 2600);

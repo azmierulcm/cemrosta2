@@ -1,4 +1,4 @@
-import { ParsedRoster, ParsedDuty, ParsedFlight, ParsedMonthlyStats } from '../types';
+import { ParsedRoster, ParsedDuty, ParsedMonthlyStats } from '../types';
 import type { ParseLogger } from '../logger';
 
 // ─────────────────────────────────────────────────────────────────────────────

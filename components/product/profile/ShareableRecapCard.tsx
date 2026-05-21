@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { RosterData, Destination } from '@/lib/types';
+import { RosterData } from '@/lib/types';
 import { Plane } from 'lucide-react';
 
 const ShareableRecapCard = ({ roster }: { roster: RosterData }) => {

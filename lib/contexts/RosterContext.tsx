@@ -71,12 +71,12 @@ export function RosterProvider({ children }: { children: React.ReactNode }) {
     }
   // user is a stable Firebase object; changes only on sign-in/sign-out which
   // triggers a full context reset anyway.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Fetch roster list whenever the logged-in user changes
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRosters(prev => prev.length === 0 ? prev : []);
       setActiveRoster(prev => prev === null ? null : null);
       setActiveRosterId(prev => prev === null ? null : null);

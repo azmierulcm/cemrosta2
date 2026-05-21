@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { DateTime } from 'luxon';
-import { DutyEvent } from '@/lib/types';
 
 interface TimeProps {
   isoUtc?: string;

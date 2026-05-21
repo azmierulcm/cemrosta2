@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import {
   Users, ShoppingBag, LayoutDashboard, Trash2, Pencil,
-  Check, X, Loader2, ChevronDown, Shield, Eye, EyeOff,
+  Check, X, Loader2, Shield, Eye, EyeOff,
 } from 'lucide-react';
 import {
   getAdminStats, adminGetAllUsers, adminUpdateUser, adminDeleteUser,
@@ -15,7 +15,7 @@ import {
   adminGetAllListings, adminSetListingStatus, adminDeleteListing, adminUpdateListing,
 } from '@/lib/actions/listings';
 import type { Listing, ListingStatus } from '@/lib/types/marketplace';
-import { CATEGORY_LABELS, CONDITION_LABELS } from '@/lib/types/marketplace';
+import { CATEGORY_LABELS } from '@/lib/types/marketplace';
 
 // NEXT_PUBLIC_ADMIN_EMAILS is used client-side only as a UX hint to hide the
 // admin panel from non-admins. The real access check happens server-side in
@@ -51,7 +51,7 @@ export default function AdminClient() {
       {/* Header */}
       <div>
         <p className="text-[10px] font-black uppercase tracking-[0.4em] text-text-subtle font-mono mb-2">
-          // Admin
+          {`// Admin`}
         </p>
         <h1 className="text-4xl font-black tracking-tighter text-text leading-none flex items-center gap-3">
           <Shield size={32} className="text-accent" />
@@ -155,7 +155,10 @@ function ListingsTab() {
     finally { setLoading(false); }
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
 
   const setStatus = async (id: string, status: ListingStatus) => {
     setActionId(id);
@@ -324,7 +327,10 @@ function UsersTab() {
     finally { setLoading(false); }
   }, [authUser]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
 
   const startEdit = (u: AdminUser) => {
     setEditId(u.uid);

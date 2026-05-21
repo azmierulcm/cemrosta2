@@ -56,6 +56,7 @@ export function InstallBanner() {
     if (isInstalled() || wasDismissed()) return;
 
     const ios = detectIOS();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsIOS(ios);
 
     if (ios) {

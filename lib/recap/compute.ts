@@ -1,5 +1,4 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { calculateKilometers } from '@/lib/utils/geo/haversine';
 import { getTopSuperlative } from './superlatives';
 import type { PeriodConfig, RecapData, TopDestination } from './types';
 import type { DutyEvent } from '@/lib/types';

@@ -30,6 +30,7 @@ const CrewCard = ({ profile, stats }: CrewCardProps) => {
         <div className="w-24 h-24 rounded-full border-2 border-passport-gold p-1 mb-4 shadow-[0_0_30px_rgba(212,175,55,0.2)]">
           <div className="w-full h-full rounded-full bg-passport-surface flex items-center justify-center overflow-hidden">
             {profile.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
             ) : (
               <span className="text-3xl font-black text-passport-gold">

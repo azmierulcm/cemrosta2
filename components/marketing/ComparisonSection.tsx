@@ -267,7 +267,10 @@ function PassportPreview() {
                   </span>
                 )}
                 {url
-                  ? <img src={url} alt={`${city} destination patch`} className="w-16 h-16 object-contain drop-shadow-sm" />
+                  ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={url} alt={`${city} destination patch`} className="w-16 h-16 object-contain drop-shadow-sm" />
+                  )
                   : <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-[11px] font-black text-accent font-mono">{iata}</div>
                 }
               </div>
@@ -339,7 +342,10 @@ function RecapPreview() {
               <div className="grid grid-cols-3 gap-2">
                 {[{ patch: LHR, city: 'London', v: 4 }, { patch: CDG, city: 'Paris', v: 2 }, { patch: SIN, city: 'Singapore', v: 3 }].map(d => (
                   <div key={d.city} className="flex flex-col items-center">
-                    {d.patch && <img src={d.patch} alt={`${d.city} destination patch`} className="w-full aspect-square object-contain" />}
+                    {d.patch && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={d.patch} alt={`${d.city} destination patch`} className="w-full aspect-square object-contain" />
+                    )}
                     <p className="text-[8px] font-bold text-center mt-0.5" style={{ color: '#222' }}>{d.city}</p>
                     <p className="text-[7px]" style={{ color: '#717171' }}>{d.v} visits</p>
                   </div>

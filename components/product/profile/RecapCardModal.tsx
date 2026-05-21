@@ -92,11 +92,10 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
   const imageUrl = buildUrl(userId, periodType, effectiveKey, format);
 
   // Reset image state whenever the URL changes (period, format, key switch)
-  const prevUrlRef = React.useRef(imageUrl);
-  if (prevUrlRef.current !== imageUrl) {
-    prevUrlRef.current = imageUrl;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setImgState('loading');
-  }
+  }, [imageUrl]);
 
   const periodLabel = effectiveKey
     ? parsePeriodKey(periodType, effectiveKey).label

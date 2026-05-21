@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, MessageCircle, Mail, Flag, BadgeCheck, Pencil, Trash2, RotateCcw, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle, Mail, Flag, Pencil, Trash2, RotateCcw, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import type { Listing } from '@/lib/types/marketplace';
 import { CATEGORY_LABELS, CONDITION_LABELS } from '@/lib/types/marketplace';

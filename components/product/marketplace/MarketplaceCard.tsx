@@ -26,9 +26,10 @@ export const MarketplaceCard = ({ listing }: { listing: Listing }) => {
       className="group cursor-pointer"
     >
       <div className="aspect-square rounded-[2.5rem] overflow-hidden mb-6 relative shadow-sm border border-border bg-white transition-all group-hover:shadow-2xl group-hover:shadow-black/10">
-        <img 
-          src={listing.image} 
-          alt={listing.title} 
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={listing.image}
+          alt={listing.title}
           className={`w-full h-full object-cover transition-transform duration-700 ${shouldReduceMotion ? '' : 'group-hover:scale-110'}`}
           loading="lazy"
         />
@@ -52,6 +53,7 @@ export const MarketplaceCard = ({ listing }: { listing: Listing }) => {
         <p className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-6 font-mono">{listing.category}</p>
         <div className="flex items-center gap-3 border-t border-border/50 pt-5">
           <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-2 border border-border shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={listing.avatar} alt={listing.seller} className="w-full h-full object-cover" />
           </div>
           <div className="flex flex-col">

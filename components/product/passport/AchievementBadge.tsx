@@ -11,8 +11,8 @@ interface BadgeProps {
   earnedAt?: string;
 }
 
-const AchievementBadge = ({ definition, earned, earnedAt }: BadgeProps) => {
-  const Icon = (Icons as any)[definition.icon_key] || Icons.Award;
+const AchievementBadge = ({ definition, earned }: BadgeProps) => {
+  const Icon = (Icons as unknown as Record<string, React.ElementType>)[definition.icon_key] || Icons.Award;
 
   const tierStyles: Record<AchievementTier, string> = {
     'common': 'bg-surface-2 border-border text-text-subtle',
