@@ -4,8 +4,8 @@
 
 ## Working directory
 This folder (`cemrosta-clean`) is the **only** correct working directory.
-- GitHub: https://github.com/azmierulcm/cemrosta2
-- Live: https://cemrosta2.vercel.app
+- GitHub: https://github.com/azmierulcm/otarosta
+- Live: https://otarosta.com (Vercel project: otarosta)
 - **Never** reference or pull code from `../cemrosta` — that folder has a Supabase mix-up and is abandoned.
 
 ## Tech stack
