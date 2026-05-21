@@ -78,6 +78,7 @@ const TRAINING_CODES: Record<string, string> = {
   OPC:       'Operator Proficiency Check',
   CRM:       'Crew Resource Management',
   TRAINING:  'Training',
+  TRAINER:   'Trainer Duty',
   CBT:       'Computer-Based Training',
   RECURRENT: 'Recurrent Training',
   TRG:       'Training',
@@ -104,7 +105,8 @@ function resolveSimCode(code: string): string {
     const suffix   = m[4] ? ` — Part ${m[4]}` : '';
     return `A${m[1]} Simulator — ${sessType} Session ${m[3]}${suffix}`;
   }
-  return `Simulator — ${code}`;
+  // Non-simulator training codes (e.g. CRM/SMS class codes like C17SMSC1)
+  return `Training — ${code}`;
 }
 
 const MONTH_MAP: Record<string, string> = {
@@ -422,14 +424,17 @@ function parseDayChunk(
   }
 
   // ── 3. Training / simulator ──────────────────────────────────────────────
-  // Short standard codes (including TDC course codes e.g. TDC2)
-  const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG|TDC\d*)\b/i;
-  // Long AIMS alphanumeric training codes (e.g. "A353UPRR", "A353ETPR", "353RRCYA")
-  const trnLongRe  = /\b([A-Z0-9]{5,}(?:OPC|SIM|TRN|UPR|ETP|REC|UPRR|ETPR|RRCYA)[A-Z0-9]*)\b/i;
   // AIMS simulator session codes: 3-digit AC type + 2-4 letter session type + digits + optional letter suffix
   // e.g. "330AOP31", "330CFF1C" (FFS), "330CED1E" (EDTO), "330BLP35"
   const aimsSimRe  = /\b(\d{3}[A-Z]{2,4}\d+[A-Z]*)\b/;
-  const trnM = chunk.match(trnShortRe) ?? chunk.match(trnLongRe) ?? chunk.match(aimsSimRe);
+  // CRM/SMS class codes: letter + digits + 2+ letters + digits (e.g. "C17SMSC1")
+  const crmStyleRe = /\b([A-Z]\d+[A-Z]{2,}\d+[A-Z]*)\b/;
+  // Long AIMS alphanumeric training codes (e.g. "A353UPRR", "A353ETPR", "353RRCYA")
+  const trnLongRe  = /\b([A-Z0-9]{5,}(?:OPC|SIM|TRN|UPR|ETP|REC|UPRR|ETPR|RRCYA)[A-Z0-9]*)\b/i;
+  // Keyword fallback — includes TRAINER for days where only the duty-code col has training info
+  const trnShortRe = /\b(SIM\/TRN|RECURRENT|TRAINING|TRAINER|SIM|TRN|GND|LPC|OPC|CRM|CBT|TRG|TDC\d*)\b/i;
+  // Try most-specific patterns first so e.g. "330AOP23" wins over a bare "OPC" keyword
+  const trnM = chunk.match(aimsSimRe) ?? chunk.match(crmStyleRe) ?? chunk.match(trnLongRe) ?? chunk.match(trnShortRe);
   if (trnM) {
     const code  = trnM[1].toUpperCase();
     const times = chunk.match(/\d{2}:\d{2}/g) ?? [];

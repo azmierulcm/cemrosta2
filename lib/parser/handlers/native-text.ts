@@ -136,6 +136,14 @@ export async function nativeTextHandler(
     });
   }
 
+  // ── 4. Normalise Unicode lookalike characters ──────────────────────────────
+  // Some PDF renderers (including MAS iFlight Crew Portal) emit the Unicode
+  // RATIO character ∶ (U+2236) instead of the ASCII colon : (U+003A) for
+  // time values like "09∶58".  All our time regexes use ASCII colon, so we
+  // normalise here — once, centrally — before any parser sees the text.
+  // Also covers FULLWIDTH COLON ： (U+FF1A) used by other portal variants.
+  mergedText = mergedText.replace(/[∶：˸꞉]/g, ':');
+
   const nonWsCount = (mergedText.match(/\S/g) ?? []).length;
   logger.info('native-text', 'Extraction complete', {
     totalChars: mergedText.length,
