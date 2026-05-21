@@ -454,7 +454,7 @@ const PrintCard = React.forwardRef<HTMLDivElement, PrintCardProps>(
             </div>
           </div>
           <div style={{ ...S, fontSize:8, fontWeight:900, letterSpacing:'0.25em', textTransform:'uppercase', color:'#D1D5DB', textAlign:'right', whiteSpace:'nowrap' }}>
-            OTAROSTA.IO
+            OTAROSTA.COM
           </div>
         </div>
       </div>
@@ -640,7 +640,7 @@ export function FamilyCard() {
           </div>
         </div>
         <p className="text-[8px] font-black uppercase tracking-[0.22em] text-text-subtle shrink-0 mt-1">
-          OTAROSTA.IO
+          OTAROSTA.COM
         </p>
       </div>
     </div>
