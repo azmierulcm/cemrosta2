@@ -1,4 +1,4 @@
-export type DutyType = 'FLIGHT' | 'STANDBY' | 'OFF' | 'TRAINING' | 'GROUND';
+export type DutyType = 'FLIGHT' | 'STANDBY' | 'LAYOVER' | 'OFF' | 'TRAINING' | 'GROUND';
 
 // Re-export telemetry types so callers only need one import path
 export type { ParseLogEntry, LogLevel } from './logger';

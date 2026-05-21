@@ -90,7 +90,7 @@ const CREW_STATUS_LABEL: Record<string, string> = {
   LAYOVER:  'LAYOVER',
   TRAINING: 'GRND',
   GROUND:   'GRND',
-  OFF:      'REST',
+  OFF:      'DAY OFF',
 };
 
 /**

@@ -53,7 +53,7 @@ const OFF_CODES: Record<string, string> = {
   DO2:  'Request Day Off',
   DO3:  'Request Day Off',
   OFF:  'Day Off',
-  REST: 'Rest Day',
+  REST: 'Day Off',
   AL:   'Annual Leave',
   SL:   'Sick Leave',
   ML:   'Maternity Leave',
@@ -492,6 +492,30 @@ function parseDayChunk(
     return duties;
   }
 
+  // ── 2c. Off / leave / medical (checked BEFORE standby) ───────────────────
+  // Must run before the standby check so that an explicit off code (D, DO,
+  // MC1 …) on the LAST date of the month is not shadowed by standby codes
+  // (S4-353, S2-353 …) that bleed in from the code-legend page when the
+  // footer truncation cannot exclude them.  Off codes are authoritative:
+  // a day cannot be both "D" (off) and a standby.
+  // Longer codes first so "DO" is not partially matched before bare "D".
+  {
+    const offRe = /\b(DO[1-9]?|MC[1-4]|COMP|CMP|OFF|REST|AL|SL|ML|HL|PH|EL|D)\b/;
+    const offM  = chunk.match(offRe);
+    if (offM) {
+      const code = offM[1].toUpperCase();
+      duties.push({
+        id:          `${code}-${dateISO}`,
+        type:        'OFF',
+        date:        dateISO,
+        day,
+        item:        code,
+        description: OFF_CODES[code] ?? `Off — ${code}`,
+      });
+      return duties;
+    }
+  }
+
   // ── 3. Training / simulator ──────────────────────────────────────────────
   // AIMS simulator session codes: 3-digit AC type + 2-4 letter session type + digits + optional letter suffix
   // e.g. "330AOP31", "330CFF1C" (FFS), "330CED1E" (EDTO), "330BLP35"
@@ -526,24 +550,6 @@ function parseDayChunk(
       dutyHrs,
       dutyCode:    dcMatch?.[1],
       description: resolveSimCode(code),
-    });
-    return duties;
-  }
-
-  // ── 4. Off / leave / medical ─────────────────────────────────────────────
-  // Longer codes first so "DO" doesn't get partially matched before "D".
-  // DO[1-9]? before bare DO so "DO1" is matched as a whole token, not just "DO"
-  const offRe = /\b(DO[1-9]?|MC[1-4]|COMP|CMP|OFF|REST|AL|SL|ML|HL|PH|EL|D)\b/;
-  const offM  = chunk.match(offRe);
-  if (offM) {
-    const code = offM[1].toUpperCase();
-    duties.push({
-      id:          `${code}-${dateISO}`,
-      type:        'OFF',
-      date:        dateISO,
-      day,
-      item:        code,
-      description: OFF_CODES[code] ?? `Off — ${code}`,
     });
     return duties;
   }
@@ -639,7 +645,19 @@ function linkContinuationArrivals(duties: ParsedDuty[], logger?: ParseLogger): v
       logger?.warn('mas-aims:link', `No unmatched flight found for continuation at ${contDuty.date}`);
     }
 
-    duties.splice(contIdx, 1);
+    // Replace the continuation placeholder with a LAYOVER entry so the
+    // arrival day appears in the calendar as "Night Stop · [PORT]" rather
+    // than as a blank / rest day.
+    const layoverPort = contDuty.flight?.arrPort ?? '';
+    duties.splice(contIdx, 1, {
+      id:          `LAYOVER-${contDuty.date}`,
+      type:        'LAYOVER',
+      date:        contDuty.date,
+      day:         contDuty.day,
+      item:        layoverPort,
+      signOff:     contDuty.signOff,
+      description: layoverPort ? `Night Stop — ${layoverPort}` : 'Night Stop',
+    });
   }
 }
 
@@ -664,8 +682,16 @@ export function parseMasAims(text: string, logger?: ParseLogger): ParsedRoster {
   // Truncate at the monthly-stats / code-legend footer so the last date's chunk
   // doesn't bleed into "Monthly Statistics", "Actual Block Hours", the code
   // description table, etc.  Stats are extracted above from the full text.
+  // Match any of:
+  //  • "Monthly Statistics" — standard footer header
+  //  • "Code Code Description" — code-legend page header
+  //  • "Block Hours <time>" — stats value row (pdf.js sometimes streams numeric
+  //    cell values before their row labels, so this catches the block-hours
+  //    figure even when it precedes the "Monthly Statistics" label in the text
+  //    stream).  The \d{1,4}:\d{2} suffix distinguishes it from the roster
+  //    table-header "Actual Block Hours" which is followed by a word, not a digit.
   const footerIdx = text.search(
-    /\bMonthly[\s\S]{0,15}Statistics\b|\bCode\s+Code\s+Description\b/i,
+    /\bMonthly[\s\S]{0,15}Statistics\b|\bCode\s+Code\s+Description\b|\bBlock\s+Hours\s+\d{1,4}:\d{2}/i,
   );
   const textForChunks = footerIdx > 0 ? text.substring(0, footerIdx) : text;
 
