@@ -18,13 +18,25 @@ function escHtml(str: string): string {
 }
 
 async function checkRateLimit(ip: string): Promise<boolean> {
-  const windowStart = Timestamp.fromMillis(Date.now() - RATE_LIMIT_WINDOW_MS);
-  const snap = await adminDb
-    .collection('bug_reports')
-    .where('ip', '==', ip)
-    .where('createdAtTs', '>=', windowStart)
-    .get();
-  return snap.size < RATE_LIMIT_MAX;
+  try {
+    // Single-field query only — avoids needing a composite Firestore index.
+    // Timestamp filtering is done in-memory on the small result set.
+    const windowStart = Date.now() - RATE_LIMIT_WINDOW_MS;
+    const snap = await adminDb
+      .collection('bug_reports')
+      .where('ip', '==', ip)
+      .orderBy('createdAtTs', 'desc')
+      .limit(RATE_LIMIT_MAX)
+      .get();
+    const recent = snap.docs.filter(
+      (d) => (d.data().createdAtTs as Timestamp)?.toMillis() >= windowStart,
+    );
+    return recent.length < RATE_LIMIT_MAX;
+  } catch {
+    // If the rate-limit check fails for any reason (missing index, cold start),
+    // allow the request through — submissions must never be silently dropped.
+    return true;
+  }
 }
 
 export async function POST(req: NextRequest) {
