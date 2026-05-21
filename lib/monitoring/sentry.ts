@@ -1,21 +1,17 @@
-/**
- * Conceptually wires up Sentry for error tracking.
- * PII scrubbing is enabled by default.
- */
+import * as Sentry from '@sentry/nextjs';
 
 export function captureException(error: unknown, context?: Record<string, unknown>) {
-  // Console logging for development
   if (process.env.NODE_ENV === 'development') {
-    console.error(`[Sentry] Exception Captured:`, error, context);
+    console.error('[Sentry] Exception:', error, context);
+    return;
   }
-
-  // Implementation for Sentry would go here
-  // Sentry.captureException(error, { extra: context });
+  Sentry.captureException(error, context ? { extra: context } : undefined);
 }
 
 export function captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'info') {
   if (process.env.NODE_ENV === 'development') {
     console.log(`[Sentry] Message [${level}]:`, message);
+    return;
   }
-  // Sentry.captureMessage(message, level);
+  Sentry.captureMessage(message, level);
 }

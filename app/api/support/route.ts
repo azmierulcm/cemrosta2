@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { adminDb } from '@/lib/firebase/admin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const SUPPORT_EMAIL = 'mainemirul@gmail.com';
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_MAX      = 3;               // max 3 submissions per window per IP
 
 /** Escape HTML special characters to prevent injection in email bodies. */
 function escHtml(str: string): string {
@@ -14,8 +17,24 @@ function escHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+async function checkRateLimit(ip: string): Promise<boolean> {
+  const windowStart = Timestamp.fromMillis(Date.now() - RATE_LIMIT_WINDOW_MS);
+  const snap = await adminDb
+    .collection('bug_reports')
+    .where('ip', '==', ip)
+    .where('createdAtTs', '>=', windowStart)
+    .get();
+  return snap.size < RATE_LIMIT_MAX;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+    const allowed = await checkRateLimit(ip);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a few minutes.' }, { status: 429 });
+    }
+
     const body = await req.json();
     const { userId, userEmail, category, description, rosterMonth, rosterYear } = body;
 
@@ -44,6 +63,8 @@ export async function POST(req: NextRequest) {
       rosterMonth: rosterMonth ?? null,
       rosterYear:  rosterYear  ?? null,
       createdAt:   timestamp,
+      createdAtTs: Timestamp.now(),
+      ip,
       status:      'open',
     });
 

@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.53.1",
     "@types/luxon": "^3.7.1",
     "firebase": "^12.13.0",
     "firebase-admin": "^13.10.0",
