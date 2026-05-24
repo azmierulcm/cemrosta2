@@ -870,7 +870,16 @@ export const Dashboard = () => {
               {/* Quick stats */}
               <div className="lg:col-span-7 grid grid-cols-2 gap-3">
                 {(() => {
-                  const flights  = activeRoster.events.filter(e => e.type === 'FLIGHT').length;
+                  // Infer home base = most frequent departure port across all flights
+                  const portCounts: Record<string, number> = {};
+                  activeRoster.events.forEach(e => {
+                    if (e.type === 'FLIGHT' && e.depPort) portCounts[e.depPort] = (portCounts[e.depPort] ?? 0) + 1;
+                  });
+                  const homeBase = Object.entries(portCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                  // Count trips: each departure from home base = 1 trip (KUL→LHR + LHR→KUL = 1)
+                  const flights = homeBase
+                    ? activeRoster.events.filter(e => e.type === 'FLIGHT' && e.depPort === homeBase).length
+                    : activeRoster.events.filter(e => e.type === 'FLIGHT').length;
                   const standby  = activeRoster.events.filter(e => e.type === 'STANDBY').length;
                   const offDays  = activeRoster.events.filter(e => e.type === 'OFF').length;
                   const blockHrs = activeRoster.stats?.totalBlockTime ?? '—';
