@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plane, Clock, MapPin, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp, Paperclip, FileText, XCircle } from 'lucide-react';
+import { Plane, Clock, MapPin, Upload, ChevronDown, Calendar, Trash2, AlertTriangle, Check, X, Pencil, Send, ChevronUp, Paperclip, FileText, XCircle, Sparkles } from 'lucide-react';
 import { useRoster } from '@/lib/contexts/RosterContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { DutyEvent } from '@/lib/types';
@@ -12,6 +12,8 @@ import { DestinationPatch } from './DestinationPatch';
 import { FileUploader } from './FileUploader';
 import { RosterTile, dayEventsToDuty } from './RosterTile';
 import { FamilyCard } from './family/FamilyCard';
+import { RecapModal } from './profile/RecapModal';
+import { getLifetimeDestinations, type EarnedDestination } from '@/lib/actions/destinations';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -612,6 +614,15 @@ export const Dashboard = () => {
   const [showUpload, setShowUpload]           = useState(false);
   const [showRosterPicker, setShowRosterPicker] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId]   = useState<string | null>(null);
+  const [isRecapOpen, setIsRecapOpen]           = useState(false);
+  const [earnedDestinations, setEarnedDestinations] = useState<EarnedDestination[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    getLifetimeDestinations(user.uid, activeRosterId ?? undefined)
+      .then(setEarnedDestinations)
+      .catch(() => setEarnedDestinations([]));
+  }, [user, activeRosterId]);
 
   // Typewriter greeting
   const [displayedGreeting, setDisplayedGreeting] = useState('');
@@ -844,8 +855,20 @@ export const Dashboard = () => {
             <section className="mb-10">
               <div className="flex items-center justify-between mb-6 border-b border-border pb-4">
                 <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Recent Stamps.</h3>
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono bg-surface-2 px-4 py-2 rounded-full border border-border">
-                  {activeRoster.destinations.length} Unlocked
+                <div className="flex items-center gap-2">
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono bg-surface-2 px-4 py-2 rounded-full border border-border">
+                    {activeRoster.destinations.length} Unlocked
+                  </div>
+                  {user && (
+                    <button
+                      onClick={() => setIsRecapOpen(true)}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-md transition-all active:scale-95 hover:opacity-90"
+                      style={{ background: 'var(--accent)' }}
+                    >
+                      <Sparkles size={11} />
+                      Generate Card
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
@@ -944,6 +967,14 @@ export const Dashboard = () => {
             rosterYear={activeRoster.year}
           />
         </>
+      )}
+      {user && (
+        <RecapModal
+          isOpen={isRecapOpen}
+          onClose={() => setIsRecapOpen(false)}
+          userId={user.uid}
+          earnedDestinations={earnedDestinations}
+        />
       )}
     </div>
   );
