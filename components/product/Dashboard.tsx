@@ -875,7 +875,7 @@ export const Dashboard = () => {
                   const offDays  = activeRoster.events.filter(e => e.type === 'OFF').length;
                   const blockHrs = activeRoster.stats?.totalBlockTime ?? '—';
                   const stats = [
-                    { label: 'Flights',      value: flights,  sub: 'this month',    bg: 'bg-sky-50',    text: 'text-sky-700',   border: 'border-sky-100'   },
+                    { label: 'Trips',        value: flights,  sub: 'this month',    bg: 'bg-sky-50',    text: 'text-sky-700',   border: 'border-sky-100'   },
                     { label: 'Block Hours',  value: blockHrs, sub: 'logged',        bg: 'bg-accent/5',  text: 'text-accent',    border: 'border-accent/10' },
                     { label: 'Standby Days', value: standby,  sub: 'on call',       bg: 'bg-amber-50',  text: 'text-amber-700', border: 'border-amber-100' },
                     { label: 'Rest Days',    value: offDays,  sub: 'off duty',      bg: 'bg-green-50',  text: 'text-green-700', border: 'border-green-100' },
