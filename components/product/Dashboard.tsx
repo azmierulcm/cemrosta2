@@ -393,6 +393,88 @@ function SupportWidget({
   );
 }
 
+// ── Today's Duty Strip ────────────────────────────────────────────────────────
+
+function TodayStrip({ events }: { events: DutyEvent[] }) {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const todayEvents = events.filter(e => e.date === todayStr);
+
+  if (todayEvents.length === 0) return null;
+
+  const flights  = todayEvents.filter(e => e.type === 'FLIGHT');
+  const primary  = flights[0] ?? todayEvents[0];
+  const type     = primary.type;
+
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dayLabel = dayNames[today.getDay()];
+
+  const configs: Record<string, { bg: string; border: string; label: string; icon: React.ReactNode }> = {
+    FLIGHT:   { bg: 'bg-sky-50',    border: 'border-sky-200',   label: 'Flight Duty',  icon: <Plane size={15} className="text-sky-600" /> },
+    STANDBY:  { bg: 'bg-amber-50',  border: 'border-amber-200', label: 'Standby',      icon: <Clock size={15} className="text-amber-600" /> },
+    LAYOVER:  { bg: 'bg-amber-50',  border: 'border-amber-200', label: 'Layover',      icon: <MapPin size={15} className="text-amber-600" /> },
+    OFF:      { bg: 'bg-green-50',  border: 'border-green-200', label: 'Rest Day',     icon: <Check size={15} className="text-green-600" /> },
+    TRAINING: { bg: 'bg-teal-50',   border: 'border-teal-200',  label: 'Training',     icon: <Clock size={15} className="text-teal-600" /> },
+    GROUND:   { bg: 'bg-teal-50',   border: 'border-teal-200',  label: 'Ground Duty',  icon: <Clock size={15} className="text-teal-600" /> },
+  };
+  const cfg = configs[type] ?? configs.OFF;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`mb-10 rounded-2xl border px-5 py-4 flex flex-wrap items-center gap-4 ${cfg.bg} ${cfg.border}`}
+    >
+      {/* Today label */}
+      <div className="flex items-center gap-2 shrink-0">
+        {cfg.icon}
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono">Today · {dayLabel}</p>
+          <p className="text-[13px] font-bold text-text leading-tight">{cfg.label}</p>
+        </div>
+      </div>
+
+      <div className="w-px h-8 bg-border/60 shrink-0 hidden sm:block" />
+
+      {/* Flight-specific details */}
+      {flights.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          {flights.map((f, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[15px] font-black text-text font-mono">
+                {f.depPort} → {f.arrPort}
+              </span>
+              {f.flightNumber && (
+                <span className="text-[11px] font-bold border border-current px-2 py-0.5 rounded-full font-mono text-sky-700">
+                  {f.flightNumber}
+                </span>
+              )}
+              {f.std && (
+                <span className="text-[12px] font-semibold text-text-muted font-mono">
+                  {f.std}{f.sta ? ` → ${f.sta}` : ''}
+                </span>
+              )}
+              {i < flights.length - 1 && <span className="text-text-subtle">·</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sign-on time for non-flight duties */}
+      {flights.length === 0 && primary.signOn && (
+        <span className="text-[14px] font-bold text-text-muted font-mono">
+          {primary.signOn}{primary.signOff ? ` – ${primary.signOff}` : ''}
+        </span>
+      )}
+
+      {/* Layover location */}
+      {type === 'LAYOVER' && primary.arrPort && (
+        <span className="text-[14px] font-bold text-text-muted">{primary.arrPort}</span>
+      )}
+    </motion.div>
+  );
+}
+
 // ── Duty grid (the new "Timeline") ────────────────────────────────────────────
 
 function DutyGrid({ events }: { events: DutyEvent[] }) {
@@ -556,7 +638,7 @@ export const Dashboard = () => {
           <h2 className="text-5xl md:text-7xl font-bold tracking-tighter text-text">
             <span className="text-accent">
               {displayedGreeting}
-              <span className="animate-pulse">|</span>
+              <span className="animate-pulse" aria-hidden="true">|</span>
             </span>
             {', '}
             {firstName}.
@@ -703,6 +785,9 @@ export const Dashboard = () => {
         </div>
       ) : (
         <>
+          {/* ── Today's duty strip ──────────────────────────────────────────── */}
+          <TodayStrip events={activeRoster.events} />
+
           {/* ── Destination stamps ──────────────────────────────────────────── */}
           {activeRoster.destinations && activeRoster.destinations.length > 0 && (
             <section className="mb-10">
@@ -720,16 +805,35 @@ export const Dashboard = () => {
             </section>
           )}
 
-          {/* ── Calendar ─────────────────────────────────────────────────────── */}
-          <section className="mb-16">
-            <div className="flex items-center gap-4 mb-6">
-              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
-              <div className="h-px flex-1 bg-border/50" />
-            </div>
-            <div className="max-w-sm">
-              <DutyCalendar onExport={handleExport} />
-            </div>
-          </section>
+          {/* ── Schedule grid: Roster Details + Calendar sidebar ────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-16">
+
+            {/* Roster Details — main column */}
+            <section className="order-2 lg:order-1 lg:col-span-8">
+              <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
+                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster Details.</h3>
+                <div className="h-px flex-1 bg-border/50" />
+                <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
+                  Tap to edit
+                </p>
+                <Pencil size={11} className="text-text-subtle" />
+              </div>
+              <div className="bg-white rounded-[2rem] border border-border p-5">
+                <DutyGrid events={activeRoster.events} />
+              </div>
+            </section>
+
+            {/* Calendar — sticky sidebar */}
+            <section className="order-1 lg:order-2 lg:col-span-4">
+              <div className="sticky top-24">
+                <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
+                  <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
+                  <div className="h-px flex-1 bg-border/50" />
+                </div>
+                <DutyCalendar />
+              </div>
+            </section>
+          </div>
 
           {/* ── Family Hub ───────────────────────────────────────────────────── */}
           <section className="mb-16">
@@ -742,21 +846,6 @@ export const Dashboard = () => {
             </div>
             <div className="rounded-[2rem] overflow-hidden border border-border">
               <FamilyCard />
-            </div>
-          </section>
-
-          {/* ── Roster Details ───────────────────────────────────────────────── */}
-          <section>
-            <div className="flex items-center gap-4 mb-6">
-              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster Details.</h3>
-              <div className="h-px flex-1 bg-border/50" />
-              <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
-                Tap to edit
-              </p>
-              <Pencil size={11} className="text-text-subtle" />
-            </div>
-            <div className="bg-white rounded-[2rem] border border-border p-5">
-              <DutyGrid events={activeRoster.events} />
             </div>
           </section>
 

@@ -17,7 +17,7 @@ import type { DutyEvent } from '@/lib/types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CREAM = '#FDF8F4';
-const RED   = '#FF385C';
+const RED   = 'var(--accent)';
 
 const MONTH_NAMES: Record<string, string> = {
   JAN:'January', FEB:'February', MAR:'March',    APR:'April',
