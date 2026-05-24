@@ -475,6 +475,57 @@ function TodayStrip({ events }: { events: DutyEvent[] }) {
   );
 }
 
+// ── Collapsible section wrapper ───────────────────────────────────────────────
+
+function CollapsibleSection({
+  title,
+  badge,
+  extra,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  extra?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="mb-10">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 border-b border-border pb-4 group text-left"
+      >
+        <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic shrink-0">
+          {title}
+        </h3>
+        <div className="h-px flex-1 bg-border/50" />
+        {badge}
+        {extra}
+        <ChevronDown
+          size={16}
+          className={`text-text-subtle shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pt-6">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
 // ── Duty grid (the new "Timeline") ────────────────────────────────────────────
 
 function DutyGrid({ events }: { events: DutyEvent[] }) {
@@ -805,49 +856,86 @@ export const Dashboard = () => {
             </section>
           )}
 
-          {/* ── Schedule grid: Roster Details + Calendar sidebar ────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-16">
-
-            {/* Roster Details — main column */}
-            <section className="order-2 lg:order-1 lg:col-span-8">
-              <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
-                <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Roster Details.</h3>
-                <div className="h-px flex-1 bg-border/50" />
-                <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono">
-                  Tap to edit
-                </p>
-                <Pencil size={11} className="text-text-subtle" />
-              </div>
-              <div className="bg-white rounded-[2rem] border border-border p-5">
-                <DutyGrid events={activeRoster.events} />
-              </div>
-            </section>
-
-            {/* Calendar — sticky sidebar */}
-            <section className="order-1 lg:order-2 lg:col-span-4">
-              <div className="sticky top-24">
-                <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
-                  <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
-                  <div className="h-px flex-1 bg-border/50" />
-                </div>
+          {/* ── Calendar + quick stats ───────────────────────────────────────── */}
+          <section className="mb-10">
+            <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
+              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Calendar.</h3>
+              <div className="h-px flex-1 bg-border/50" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Calendar widget */}
+              <div className="lg:col-span-5">
                 <DutyCalendar />
               </div>
-            </section>
-          </div>
-
-          {/* ── Family Hub ───────────────────────────────────────────────────── */}
-          <section className="mb-16">
-            <div className="flex items-center gap-4 mb-6 border-b border-border pb-4">
-              <h3 className="text-3xl font-bold text-text tracking-tighter uppercase italic">Family Hub.</h3>
-              <div className="h-px flex-1 bg-border/50" />
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-text-subtle font-mono bg-surface-2 px-4 py-2 rounded-full border border-border">
-                Share with your loved ones
-              </span>
-            </div>
-            <div className="rounded-[2rem] overflow-hidden border border-border">
-              <FamilyCard />
+              {/* Quick stats */}
+              <div className="lg:col-span-7 grid grid-cols-2 gap-3">
+                {(() => {
+                  const flights  = activeRoster.events.filter(e => e.type === 'FLIGHT').length;
+                  const standby  = activeRoster.events.filter(e => e.type === 'STANDBY').length;
+                  const offDays  = activeRoster.events.filter(e => e.type === 'OFF').length;
+                  const blockHrs = activeRoster.monthlyStats?.actualBlockHours ?? activeRoster.stats?.totalBlockTime ?? '—';
+                  const stats = [
+                    { label: 'Flights',      value: flights,  sub: 'this month',    bg: 'bg-sky-50',    text: 'text-sky-700',   border: 'border-sky-100'   },
+                    { label: 'Block Hours',  value: blockHrs, sub: 'logged',        bg: 'bg-accent/5',  text: 'text-accent',    border: 'border-accent/10' },
+                    { label: 'Standby Days', value: standby,  sub: 'on call',       bg: 'bg-amber-50',  text: 'text-amber-700', border: 'border-amber-100' },
+                    { label: 'Rest Days',    value: offDays,  sub: 'off duty',      bg: 'bg-green-50',  text: 'text-green-700', border: 'border-green-100' },
+                  ];
+                  return stats.map(s => (
+                    <div key={s.label} className={`rounded-2xl border p-5 flex flex-col gap-1 ${s.bg} ${s.border}`}>
+                      <span className={`text-[32px] font-black leading-none tracking-tight ${s.text}`}>{s.value}</span>
+                      <span className="text-[13px] font-bold text-text leading-tight">{s.label}</span>
+                      <span className="text-[11px] text-text-muted">{s.sub}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
           </section>
+
+          {/* ── Family Hub (collapsible) ─────────────────────────────────────── */}
+          {(() => {
+            const flightCount  = activeRoster.events.filter(e => e.type === 'FLIGHT').length;
+            const standbyCount = activeRoster.events.filter(e => e.type === 'STANDBY').length;
+            return (
+              <CollapsibleSection
+                title="Family Hub."
+                badge={
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono bg-surface-2 px-3 py-1.5 rounded-full border border-border shrink-0">
+                    {flightCount} flights · {standbyCount} standby
+                  </span>
+                }
+              >
+                <div className="rounded-[2rem] overflow-hidden border border-border">
+                  <FamilyCard />
+                </div>
+              </CollapsibleSection>
+            );
+          })()}
+
+          {/* ── Roster Details (collapsible) ─────────────────────────────────── */}
+          {(() => {
+            const totalDuties = activeRoster.events.filter(e => e.type !== 'OFF').length;
+            return (
+              <CollapsibleSection
+                title="Roster Details."
+                badge={
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-text-subtle font-mono bg-surface-2 px-3 py-1.5 rounded-full border border-border shrink-0">
+                    {totalDuties} duties
+                  </span>
+                }
+                extra={
+                  <span className="hidden sm:flex items-center gap-1.5 text-[10px] font-black text-text-subtle uppercase tracking-widest font-mono shrink-0">
+                    <Pencil size={10} />
+                    Tap tile to edit
+                  </span>
+                }
+              >
+                <div className="bg-white rounded-[2rem] border border-border p-5">
+                  <DutyGrid events={activeRoster.events} />
+                </div>
+              </CollapsibleSection>
+            );
+          })()}
 
           <SupportWidget
             userId={user?.uid}
