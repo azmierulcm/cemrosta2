@@ -20,11 +20,11 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-[100] border-t border-border bg-bg/90 backdrop-blur-sm md:hidden"
-      style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      className="fixed bottom-0 left-0 right-0 z-[100] border-t border-border bg-bg md:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Main navigation"
     >
-      <div className="flex items-stretch justify-around px-2 pt-2">
+      <div className="flex items-stretch justify-around px-2 pt-2 pb-3">
         {navItems.map((item) => {
           const isActive =
             item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)
