@@ -282,13 +282,14 @@ function buildDownloadUrl(userId: string, periodType: PeriodType): string {
 }
 
 // ── Capture the card ref as a PNG blob ───────────────────────────────────────
+// Avatar is proxied through /api/proxy-image (same-origin) so canvas stays clean.
 
 async function captureCardBlob(el: HTMLElement): Promise<Blob> {
-  // html-to-image sometimes needs a second pass on first render (font/image caching)
+  // First pass warms up font/image cache; second pass produces the clean render.
   let dataUrl = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true });
+      dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: false });
       if (dataUrl) break;
     } catch {
       if (attempt === 1) throw new Error('capture failed');
@@ -632,13 +633,12 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
         {/* ── Header ── */}
         <header className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Avatar — crossOrigin="anonymous" prevents canvas taint during image capture */}
+            {/* Avatar served via same-origin proxy so canvas capture doesn't taint */}
             {profile.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={profile.avatarUrl}
+                src={`/api/proxy-image?url=${encodeURIComponent(profile.avatarUrl)}`}
                 alt={profile.name}
-                crossOrigin="anonymous"
                 className="h-9 w-9 rounded-full object-cover shadow-md shrink-0"
               />
             ) : (
