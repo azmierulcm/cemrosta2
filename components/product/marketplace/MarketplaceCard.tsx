@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -26,12 +27,12 @@ export const MarketplaceCard = ({ listing }: { listing: Listing }) => {
       className="group cursor-pointer"
     >
       <div className="aspect-square rounded-[2.5rem] overflow-hidden mb-6 relative shadow-sm border border-border bg-white transition-all group-hover:shadow-2xl group-hover:shadow-black/10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={listing.image}
           alt={listing.title}
-          className={`w-full h-full object-cover transition-transform duration-700 ${shouldReduceMotion ? '' : 'group-hover:scale-110'}`}
-          loading="lazy"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className={`object-cover transition-transform duration-700 ${shouldReduceMotion ? '' : 'group-hover:scale-110'}`}
         />
         <div className="absolute top-5 left-5 flex flex-col gap-2">
            <div className="bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-text shadow-xl border border-border">
@@ -52,9 +53,14 @@ export const MarketplaceCard = ({ listing }: { listing: Listing }) => {
         </div>
         <p className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-6 font-mono">{listing.category}</p>
         <div className="flex items-center gap-3 border-t border-border/50 pt-5">
-          <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-2 border border-border shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={listing.avatar} alt={listing.seller} className="w-full h-full object-cover" />
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-2 border border-border shadow-sm relative">
+            <Image
+              src={listing.avatar}
+              alt={listing.seller}
+              width={32}
+              height={32}
+              className="w-full h-full object-cover"
+            />
           </div>
           <div className="flex flex-col">
             <span className="text-[11px] font-bold text-text truncate max-w-[140px] tracking-tight">{listing.seller}</span>

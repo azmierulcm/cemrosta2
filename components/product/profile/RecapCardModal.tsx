@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Share2, Copy, Check, Smartphone, Monitor } from 'lucide-react';
 
@@ -271,14 +272,15 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
                   </div>
                 )}
 
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   key={imageUrl}
                   src={imageUrl}
                   alt="Recap preview"
-                  className="w-full h-full object-cover"
+                  fill
+                  priority
+                  unoptimized={imgState !== 'ok'}
+                  className="object-cover transition-opacity duration-300"
                   style={{ opacity: imgState === 'ok' ? 1 : 0 }}
-                  loading="eager"
                   onLoad={() => setImgState('ok')}
                   onError={() => setImgState('error')}
                 />

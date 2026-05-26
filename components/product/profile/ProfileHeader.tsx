@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Share2 } from 'lucide-react';
 
 interface ProfileHeaderProps {
@@ -40,11 +41,12 @@ export function ProfileHeader({
     <div className="bg-bg border border-border rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] p-8 flex items-center gap-5">
       {/* Avatar */}
       {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={avatarUrl}
           alt={displayName}
-          className="w-14 h-14 rounded-full object-cover border border-border shrink-0"
+          width={56}
+          height={56}
+          className="rounded-full object-cover border border-border shrink-0"
         />
       ) : (
         <Initials name={displayName} />

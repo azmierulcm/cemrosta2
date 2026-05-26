@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { Grid, Share, Settings } from 'lucide-react';
 
 interface GalleryProps {
@@ -47,22 +48,25 @@ const ProfileGallery = ({ name = 'Crew Member', photos = [], onEdit, isOwner }: 
       <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[400px] md:h-[500px] rounded-2xl overflow-hidden relative group shadow-sm border border-border">
         {/* Main large photo */}
         <div className="col-span-2 row-span-2 relative overflow-hidden bg-surface">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={displayPhotos[0] || defaultPhotos[0]}
             alt="Profile main"
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-700 cursor-pointer"
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            priority
+            className="object-cover hover:scale-105 transition-transform duration-700 cursor-pointer"
           />
         </div>
 
         {/* Small photos (fill up with placeholders if fewer than 5) */}
         {[1, 2, 3, 4].map((idx) => (
           <div key={idx} className="relative overflow-hidden bg-surface-2 hidden md:block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={displayPhotos[idx] || defaultPhotos[idx]}
               alt={`Gallery ${idx}`}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-700 cursor-pointer"
+              fill
+              sizes="25vw"
+              className="object-cover hover:scale-105 transition-transform duration-700 cursor-pointer"
             />
           </div>
         ))}

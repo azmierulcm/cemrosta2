@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Share2, Copy, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
@@ -674,15 +675,16 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Avatar: data: URL (pre-fetched) used directly; Firebase URLs proxied same-origin */}
             {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={
                   profile.avatarUrl.startsWith('data:')
                     ? profile.avatarUrl
                     : `/api/proxy-image?url=${encodeURIComponent(profile.avatarUrl)}`
                 }
                 alt={profile.name}
-                className="h-9 w-9 rounded-full object-cover shadow-md shrink-0"
+                width={36}
+                height={36}
+                className="rounded-full object-cover shadow-md shrink-0"
               />
             ) : (
               <div
@@ -736,15 +738,17 @@ function LiveRosterCard({ data, profile }: { data: CardData; profile: CardProfil
                     style={{ minHeight: 100 }}
                   >
                     {/* eager loading ensures images are ready when html-to-image captures */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={`/images/city_patches/${IATA_PATCH[d.code] ?? `${d.code.toLowerCase()}_patch.png`}`}
                       alt={`${d.city} stamp`}
+                      width={100}
+                      height={100}
                       className="w-full h-full object-contain"
-                      loading="eager"
+                      priority
+                      unoptimized
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('hidden');
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        (e.currentTarget as HTMLImageElement).nextElementSibling?.removeAttribute('hidden');
                       }}
                     />
                     <div hidden className="flex flex-col items-center justify-center gap-1 p-3">

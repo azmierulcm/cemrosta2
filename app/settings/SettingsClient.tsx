@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -301,8 +302,13 @@ export default function SettingsClient() {
             <div className="relative shrink-0">
               <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-accent/10 flex items-center justify-center">
                 {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
+                  <Image
+                    src={avatarUrl}
+                    alt="Profile photo"
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <span className="text-[26px] font-black text-accent select-none leading-none">
                     {(form.full_name || user?.email || '?').slice(0, 1).toUpperCase()}

@@ -2,6 +2,7 @@
 
 import { Flame } from 'lucide-react';
 import { getAirportMeta } from '@/lib/utils/destinations';
+import Image from 'next/image';
 
 export interface TopDestEntry {
   iata: string;
@@ -66,10 +67,11 @@ function DestCard({ dest, rank, spanFull }: { dest: TopDestEntry; rank: number; 
       {/* Flag + city */}
       <div className={`flex items-center gap-2 sm:gap-3 ${spanFull ? '' : 'my-1'}`}>
         <div className="relative w-10 h-7 sm:w-12 sm:h-8 overflow-hidden bg-surface border border-border shrink-0 shadow-sm">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={`https://flagcdn.com/w80/${dest.flagCode}.png`}
             alt={dest.iata}
+            width={48}
+            height={32}
             className="w-full h-full object-cover"
           />
         </div>

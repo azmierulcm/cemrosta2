@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import {
@@ -384,8 +385,13 @@ function UsersTab() {
                   {/* Avatar */}
                   <td className="px-4 py-3">
                     {u.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={u.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover border border-border" />
+                      <Image
+                        src={u.avatar_url}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="rounded-full object-cover border border-border"
+                      />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-[11px] font-black text-accent">
                         {(u.full_name || u.email || '?').slice(0, 1).toUpperCase()}

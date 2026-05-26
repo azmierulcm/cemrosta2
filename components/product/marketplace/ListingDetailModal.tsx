@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, MessageCircle, ShieldCheck, AlertTriangle, Flag, Clock, Loader2 } from 'lucide-react';
 import { DateTime } from 'luxon';
@@ -99,11 +100,13 @@ export const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: List
 
             {/* Left: Image Carousel */}
             <div className="w-full md:w-3/5 bg-surface-2 relative group h-1/3 md:h-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={images[currentImg]}
                 alt={listing.title}
-                className="w-full h-full object-cover"
+                fill
+                priority
+                sizes="(max-width: 768px) 100vw, 60vw"
+                className="object-cover"
               />
               
               {images.length > 1 && (
@@ -179,10 +182,11 @@ export const ListingDetailModal = ({ listing, isOpen, onClose }: { listing: List
                  {/* Seller Card */}
                  <div className="bg-surface-2 p-6 rounded-[2rem] border border-border flex items-center gap-5 group transition-all hover:bg-white hover:shadow-xl hover:shadow-black/5">
                     <div className="w-16 h-16 rounded-2xl bg-white border border-border overflow-hidden relative shadow-sm">
-                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                       <img
+                       <Image
                          src={listing.profiles?.avatar_url || `https://i.pravatar.cc/150?u=${listing.seller_id}`}
                          alt="Seller"
+                         width={64}
+                         height={64}
                          className="w-full h-full object-cover"
                        />
                     </div>

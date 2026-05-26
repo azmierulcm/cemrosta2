@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 
 const PublicProfileGallery = () => {
   const photos = [
@@ -15,11 +16,13 @@ const PublicProfileGallery = () => {
     <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-3 h-[500px] md:h-[600px] mb-12 rounded-3xl overflow-hidden">
       {/* 1 Large Photo (Left) */}
       <div className="md:col-span-2 md:row-span-2 relative overflow-hidden group">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={photos[0]}
           alt="Featured"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 cursor-pointer"
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          priority
+          className="object-cover group-hover:scale-105 transition-transform duration-700 cursor-pointer"
         />
         <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors pointer-events-none" />
       </div>
@@ -27,11 +30,12 @@ const PublicProfileGallery = () => {
       {/* 4 Small Photos (Right Grid) */}
       {photos.slice(1).map((src, i) => (
         <div key={i} className="relative overflow-hidden group hidden md:block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={src}
             alt={`Gallery ${i + 1}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 cursor-pointer"
+            fill
+            sizes="25vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-700 cursor-pointer"
           />
           <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors pointer-events-none" />
         </div>
