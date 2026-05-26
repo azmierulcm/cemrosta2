@@ -78,16 +78,19 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
         <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
       </head>
-      <body className="min-h-full flex flex-col bg-bg text-text selection:bg-accent/30">
-        <a 
-          href="#main-content" 
+      <body className="h-full flex flex-col bg-bg text-text selection:bg-accent/30">
+        <a
+          href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:bg-accent focus:text-accent-fg focus:px-6 focus:py-3 focus:rounded-xl focus:font-bold focus:shadow-2xl"
         >
           Skip to content
         </a>
         <AuthProvider>
           <RosterProvider>
-            <div className="pb-20 md:pb-0">
+            {/* flex-1 + min-h-0 makes this div the scroll container (not the body/window).
+                position:fixed elements (BottomNav, InstallBanner) stay truly viewport-fixed
+                on all pages and browsers — including iOS Safari with long roster content. */}
+            <div className="flex-1 min-h-0 overflow-y-auto pb-20 md:pb-0">
               {children}
             </div>
             <InstallBanner />
