@@ -437,18 +437,8 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
     if (!cardRef.current || isDownloading) return;
     setIsDownloading(true);
     try {
-      const blob     = await captureCardBlob(cardRef.current);
-      const filename = `Mission-Recap-${data.periodLabel.replace(/\s/g, '-')}.png`;
-      const file     = new File([blob], filename, { type: 'image/png' });
-
-      // On iOS, a.click() opens the file in the browser instead of saving it.
-      // Web Share API with files triggers the native "Save Image" sheet instead.
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: filename });
-        return;
-      }
-
-      // Desktop fallback
+      const blob      = await captureCardBlob(cardRef.current);
+      const filename  = `Mission-Recap-${data.periodLabel.replace(/\s/g, '-')}.png`;
       const objectUrl = URL.createObjectURL(blob);
       const a         = document.createElement('a');
       a.href          = objectUrl;
@@ -456,7 +446,7 @@ export function RecapModal({ isOpen, onClose, userId, earnedDestinations }: Reca
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(objectUrl);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch (err) {
       console.error('[RecapModal] download failed', err);
       setDownloadError(true);
