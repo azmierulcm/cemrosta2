@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { DESTINATION_CATALOG, REGION_COLORS } from '@/lib/data/destination-catalog';
 import { getPatchImageUrl } from '@/lib/patches/patch-images';
@@ -90,8 +91,7 @@ function PatchCard({ entry, visits }: { entry: typeof DESTINATION_CATALOG[0]; vi
 
         {/* Artwork */}
         {patchUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={patchUrl} alt={`${entry.city} patch`} className="w-[100px] h-[100px] object-contain" />
+          <Image src={patchUrl} alt={`${entry.city} patch`} width={100} height={100} className="object-contain" />
         ) : (
           <div className="w-[64px] h-[64px]" style={{ color: regionColor }}>
             <Illustration size={64} />
@@ -171,8 +171,9 @@ function DemoLiveRosterCard() {
             ].map((d) => (
               <div key={d.city} className="flex flex-col items-center">
                 {d.patch && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.patch} alt={d.city} className="w-full aspect-square object-contain" />
+                  <div className="relative w-full aspect-square">
+                    <Image src={d.patch} alt={d.city} fill sizes="80px" className="object-contain" />
+                  </div>
                 )}
                 <p className="text-[8px] font-bold text-center mt-0.5" style={{ color: '#222' }}>{d.city}</p>
                 <p className="text-[7px]" style={{ color: '#717171' }}>{d.visits} visits</p>
@@ -292,8 +293,7 @@ export default function DemoClient() {
         {/* Decorative patch preview — right side */}
         <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden lg:flex gap-4">
           {['kuala_lumpur_patch.png', 'london_patch.png', 'sydney_patch.png'].map(f => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={f} src={`/images/city_patches/${f}`} alt="" className="w-24 h-24 object-contain drop-shadow-md" />
+            <Image key={f} src={`/images/city_patches/${f}`} alt="" width={96} height={96} className="object-contain drop-shadow-md" />
           ))}
         </div>
       </div>
