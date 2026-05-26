@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Upload } from 'lucide-react';
 
@@ -107,8 +108,9 @@ function PassportPreview() {
             transition={{ delay: i * 0.07, duration: 0.35 }}
             className="flex flex-col items-center gap-1"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.src} alt={p.city} className="w-full aspect-square object-contain drop-shadow-sm" />
+            <div className="relative w-full aspect-square">
+              <Image src={p.src} alt={p.city} fill sizes="80px" className="object-contain drop-shadow-sm" />
+            </div>
             <span className="text-[8px] font-black font-mono text-text-muted">{p.city}</span>
             <span className="text-[7px] font-black text-text-subtle">{p.count}×</span>
           </motion.div>
