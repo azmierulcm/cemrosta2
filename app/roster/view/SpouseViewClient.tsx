@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DateTime } from 'luxon';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plane, Moon, Coffee, ChevronRight, CalendarDays,
-  MapPin, BadgeCheck, AlertCircle, Loader2,
-  ChevronLeft, Clock, X,
+  Plane, Check, ChevronRight, ChevronLeft,
+  Clock3, MapPin, CalendarDays, BadgeCheck,
+  Moon, Sun, AlertCircle, Loader2,
 } from 'lucide-react';
 import { getAirportMeta } from '@/lib/utils/destinations';
 import type { DutyEvent } from '@/lib/types';
@@ -30,56 +30,82 @@ interface PilotInfo {
   base: string;
 }
 
-// ─── Card data model (adapted from your design) ────────────────────────────────
+// ─── Internal card types ──────────────────────────────────────────────────────
 
-type CardType = 'flight' | 'off' | 'standby' | 'training' | 'blank';
+type DayType = 'flight' | 'standby' | 'off' | 'training' | 'rest';
 
 interface Sector {
-  from: string;
-  to: string;
-  flight: string;
-  depart: string;
-  arrive: string;
+  id: string;
+  flightNo: string;
+  dep: string;
+  arr: string;
+  depTime: string;
+  arrTime: string;
+  aircraft: string;
+  workType: string;
 }
 
-interface CardItem {
+interface RosterDay {
   date: number;
   dateStr: string;
-  day: string;         // "Mon" etc.
-  type: CardType;
-  code?: string;
-  home: string;
-  start?: string;
-  end?: string;
-  work?: string;
-  continues: boolean;
+  type: DayType;
+  label: string;
+  base: string;
+  dutyStart?: string;
+  dutyEnd?: string;
+  crewStatus?: string;
+  continuesNextDay: boolean;
   sectors: Sector[];
 }
 
+// ─── Colour system (vivid, not the pale bg-*-50 from the original design) ─────
+
+// Un-selected duty cell — vivid but not blinding
+const CELL_IDLE: Record<DayType, string> = {
+  flight:   'bg-sky-300   text-sky-900   ring-1 ring-sky-400   hover:bg-sky-400',
+  standby:  'bg-amber-300 text-amber-900 ring-1 ring-amber-400 hover:bg-amber-400',
+  off:      'bg-emerald-300 text-emerald-900 ring-1 ring-emerald-400 hover:bg-emerald-400',
+  training: 'bg-fuchsia-300 text-fuchsia-900 ring-1 ring-fuchsia-400 hover:bg-fuchsia-400',
+  rest:     'bg-zinc-200   text-zinc-500   ring-1 ring-zinc-300   hover:bg-zinc-300',
+};
+
+// Active / selected cell — solid saturated colour
+const CELL_ACTIVE: Record<DayType, string> = {
+  flight:   'bg-sky-600   text-white ring-2 ring-sky-700   shadow-lg shadow-sky-300/50',
+  standby:  'bg-amber-500 text-white ring-2 ring-amber-600 shadow-lg shadow-amber-300/50',
+  off:      'bg-emerald-600 text-white ring-2 ring-emerald-700 shadow-lg shadow-emerald-300/50',
+  training: 'bg-fuchsia-600 text-white ring-2 ring-fuchsia-700 shadow-lg shadow-fuchsia-300/50',
+  rest:     'bg-zinc-400   text-white ring-2 ring-zinc-500',
+};
+
+// Dot inside the compact cell
+const DOT: Record<DayType, string> = {
+  flight:   'bg-sky-600',
+  standby:  'bg-amber-600',
+  off:      'bg-emerald-700',
+  training: 'bg-fuchsia-700',
+  rest:     'bg-zinc-400',
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function cn(...parts: (string | boolean | undefined | null)[]): string {
+function cn(...parts: (string | boolean | undefined | null)[]) {
   return parts.filter(Boolean).join(' ');
 }
 
-function cityName(iata?: string | null): string {
+function cityName(iata?: string | null) {
   if (!iata) return iata ?? '';
   return getAirportMeta(iata).city || iata;
 }
 
-function isOvernightFlight(f: DutyEvent): boolean {
-  if (!f.std || !f.sta) return false;
-  return f.sta < f.std;
+function isOvernight(f: DutyEvent) {
+  return !!(f.std && f.sta && f.sta < f.std);
 }
 
-// Convert our DutyEvent[] for a given day into a CardItem
-function buildCardItem(
-  dateStr: string,
-  events: DutyEvent[],
-  base: string,
-): CardItem {
-  const dt  = DateTime.fromISO(dateStr);
-  const day = dt.toFormat('ccc'); // "Mon", "Tue" …
+// ─── Build one RosterDay from the DutyEvent[] for a date ─────────────────────
+
+function buildDay(dateStr: string, events: DutyEvent[], base: string): RosterDay {
+  const dt = DateTime.fromISO(dateStr);
 
   const flights  = events.filter(e => e.type === 'FLIGHT');
   const standby  = events.find(e => e.type === 'STANDBY');
@@ -87,105 +113,109 @@ function buildCardItem(
   const off      = events.find(e => e.type === 'OFF');
   const training = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
 
-  // ── Flight day ──
+  // Flight day
   if (flights.length > 0) {
-    const first = flights[0];
-    const last  = flights[flights.length - 1];
-    const overnight = isOvernightFlight(last);
-    const sectors: Sector[] = flights.map(f => ({
-      from:   f.depPort || '—',
-      to:     f.arrPort || '—',
-      flight: f.item || f.flightNumber || '—',
-      depart: f.std || f.signOn || '—',
-      arrive: `${f.sta || f.signOff || '—'}${isOvernightFlight(f) ? '+' : ''}`,
+    const first    = flights[0];
+    const last     = flights[flights.length - 1];
+    const overnight = isOvernight(last);
+    const continues = overnight || !!layover;
+
+    const sectors: Sector[] = flights.map((f, i) => ({
+      id:       f.id || `${dateStr}-${i}`,
+      flightNo: f.item || f.flightNumber || '—',
+      dep:      f.depPort || '—',
+      arr:      f.arrPort || '—',
+      depTime:  f.std || f.signOn || '—',
+      arrTime:  `${f.sta || f.signOff || '—'}${isOvernight(f) ? '+' : ''}`,
+      aircraft: f.acType || '—',
+      workType: f.dutyCode || 'OP',
     }));
-    // Also attach layover sector if exists (represents the overnight leg)
-    if (layover && layover.depPort && layover.arrPort) {
-      sectors.push({
-        from:   layover.depPort,
-        to:     layover.arrPort,
-        flight: layover.item || 'LAY',
-        depart: layover.signOn || '—',
-        arrive: layover.signOff || '—',
-      });
-    }
+
     return {
-      date: dt.day, dateStr, day,
+      date: dt.day, dateStr,
       type: 'flight',
-      code: first.item || first.flightNumber,
-      home: base,
-      start: first.std || first.signOn,
-      end:  `${last.sta || last.signOff || ''}${overnight ? '+' : ''}`,
-      work: first.dutyCode,
-      continues: overnight || !!layover,
+      label: `${flights.length}x`,
+      base,
+      dutyStart: first.std || first.signOn,
+      dutyEnd:   `${last.sta || last.signOff || ''}${overnight ? '+' : ''}`,
+      crewStatus: first.dutyCode === 'DH' ? 'Deadheading' : 'Operating',
+      continuesNextDay: continues,
       sectors,
     };
   }
 
-  // ── Standby day (includes LAYOVER-only days — pilot away on standby) ──
-  if (standby || (layover && !flights.length)) {
+  // Standby (includes LAYOVER-only)
+  if (standby || layover) {
     const ev = standby || layover!;
-    const sectors: Sector[] = (ev.depPort && ev.arrPort) ? [{
-      from:   ev.depPort,
-      to:     ev.arrPort,
-      flight: ev.item || '',
-      depart: ev.signOn || '—',
-      arrive: ev.signOff || '—',
-    }] : [];
+    const sector: Sector | null = ev.depPort && ev.arrPort ? {
+      id:       `${dateStr}-sby`,
+      flightNo: ev.item || '—',
+      dep:      ev.depPort,
+      arr:      ev.arrPort,
+      depTime:  ev.signOn || '—',
+      arrTime:  ev.signOff || '—',
+      aircraft: '—',
+      workType: 'SBY',
+    } : null;
+
     return {
-      date: dt.day, dateStr, day,
+      date: dt.day, dateStr,
       type: 'standby',
-      code: ev.item,
-      home: base,
-      start: ev.signOn,
-      end:   ev.signOff,
-      continues: false,
-      sectors,
+      label: ev.item || 'SBY',
+      base,
+      dutyStart: ev.signOn,
+      dutyEnd:   ev.signOff,
+      crewStatus: standby ? (ev.item?.startsWith('S4') ? 'Airport standby' : 'Home standby') : 'On layover',
+      continuesNextDay: false,
+      sectors: sector ? [sector] : [],
     };
   }
 
-  // ── Training / ground duty ──
+  // Training / ground
   if (training) {
     return {
-      date: dt.day, dateStr, day,
+      date: dt.day, dateStr,
       type: 'training',
-      code: training.item || training.description,
-      home: base,
-      start: training.signOn,
-      end:   training.signOff,
-      continues: false,
+      label: training.item || 'TRN',
+      base,
+      dutyStart: training.signOn,
+      dutyEnd:   training.signOff,
+      crewStatus: training.description || 'Ground duty',
+      continuesNextDay: false,
       sectors: [],
     };
   }
 
-  // ── Off day ──
+  // Off
   if (off) {
     return {
-      date: dt.day, dateStr, day,
+      date: dt.day, dateStr,
       type: 'off',
-      code: off.item || 'D',
-      home: base,
-      continues: false,
+      label: off.item || 'D',
+      base,
+      crewStatus: off.item === 'DO' ? 'Day off' : 'Off at base',
+      continuesNextDay: false,
       sectors: [],
     };
   }
 
-  // ── Blank / rest ──
+  // Rest / blank
   return {
-    date: dt.day, dateStr, day,
-    type: 'blank',
-    home: base,
-    continues: false,
+    date: dt.day, dateStr,
+    type: 'rest',
+    label: '—',
+    base,
+    crewStatus: 'Rest day',
+    continuesNextDay: false,
     sectors: [],
   };
 }
 
-// Build the full month's card list (all days, including blanks with no events)
-function buildRosterCards(roster: SharedRoster, base: string): CardItem[] {
+// Build all 28–31 days for the month
+function buildRosterDays(roster: SharedRoster, base: string): RosterDay[] {
   const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
   if (!start.isValid) return [];
 
-  // Group events by date
   const eventMap = new Map<string, DutyEvent[]>();
   for (const e of roster.events ?? []) {
     const list = eventMap.get(e.date) ?? [];
@@ -193,324 +223,234 @@ function buildRosterCards(roster: SharedRoster, base: string): CardItem[] {
     eventMap.set(e.date, list);
   }
 
-  const daysInMonth = start.daysInMonth ?? 30;
-  const cards: CardItem[] = [];
-  for (let d = 1; d <= daysInMonth; d++) {
+  const days: RosterDay[] = [];
+  for (let d = 1; d <= (start.daysInMonth ?? 30); d++) {
     const dt      = start.set({ day: d });
     const dateStr = dt.toFormat('yyyy-MM-dd');
-    cards.push(buildCardItem(dateStr, eventMap.get(dateStr) ?? [], base));
+    days.push(buildDay(dateStr, eventMap.get(dateStr) ?? [], base));
   }
-  return cards;
+  return days;
 }
 
-// ─── Type styles ──────────────────────────────────────────────────────────────
+// Build calendar cells (null = empty pad)
+function buildCalendarCells(roster: SharedRoster): (number | null)[] {
+  const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
+  if (!start.isValid) return [];
+  const offset = start.weekday === 7 ? 6 : start.weekday - 1; // Mon-first
+  const cells: (number | null)[] = Array(offset).fill(null);
+  for (let d = 1; d <= (start.daysInMonth ?? 30); d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
 
-const TYPE_STYLES: Record<CardType, {
-  card: string; bar: string; badge: string; text: string;
-}> = {
-  flight:   { card: 'bg-sky-50 border-sky-200',       bar: 'from-sky-600 to-cyan-500',       badge: 'bg-sky-100 text-sky-700',       text: 'text-sky-900'     },
-  off:      { card: 'bg-emerald-50 border-emerald-200', bar: 'from-emerald-700 to-lime-600',  badge: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-900' },
-  standby:  { card: 'bg-yellow-50 border-yellow-200',  bar: 'from-yellow-600 to-amber-400',   badge: 'bg-yellow-100 text-yellow-800',  text: 'text-yellow-900'  },
-  training: { card: 'bg-fuchsia-50 border-fuchsia-200', bar: 'from-fuchsia-700 to-pink-500', badge: 'bg-fuchsia-100 text-fuchsia-700', text: 'text-fuchsia-900' },
-  blank:    { card: 'bg-slate-50 border-slate-200',    bar: 'from-slate-300 to-slate-200',    badge: 'bg-slate-100 text-slate-500',    text: 'text-slate-700'   },
-};
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const TYPE_LABEL: Record<CardType, string> = {
-  flight: 'Flight', off: 'Off', standby: 'Standby', training: 'Training', blank: 'Rest',
-};
+const DOW = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-// ─── RosterCard ───────────────────────────────────────────────────────────────
+function InfoPill({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 backdrop-blur">
+      <div className="mb-1 flex items-center gap-1.5 text-white/45">
+        {icon}
+        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+      </div>
+      <p className="truncate text-xs font-black text-white">{value}</p>
+    </div>
+  );
+}
 
-function RosterCard({
-  item, isSelected, onClick, isToday,
+function AirportBlock({ code, time, align }: { code: string; time: string; align: 'left' | 'right' }) {
+  return (
+    <div className={align === 'right' ? 'text-right' : 'text-left'}>
+      <p className="text-2xl font-black tracking-tight text-slate-950 leading-none">{code}</p>
+      <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{cityName(code)}</p>
+      <p className="mt-1 text-[13px] font-black text-slate-600">{time}</p>
+    </div>
+  );
+}
+
+function Summary({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-3xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
+      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-slate-500 shadow-sm ring-1 ring-zinc-100">
+        {icon}
+      </div>
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">{label}</p>
+      <p className="mt-1 text-lg font-black text-zinc-800">{value}</p>
+    </div>
+  );
+}
+
+function RosterDetailCard({
+  day,
+  monthYear,
+  todayStr,
 }: {
-  item: CardItem;
-  isSelected: boolean;
-  onClick: () => void;
-  isToday: boolean;
+  day: RosterDay;
+  monthYear: string;
+  todayStr: string;
 }) {
-  const style = TYPE_STYLES[item.type];
+  const isToday    = day.dateStr === todayStr;
+  const sectorCount = day.sectors.length;
 
   return (
-    <motion.button
-      type="button"
-      layout
-      onClick={onClick}
-      whileTap={{ scale: 0.97 }}
-      className={cn(
-        'group relative min-h-[132px] w-full overflow-hidden rounded-3xl border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg',
-        style.card,
-        isSelected  && 'ring-2 ring-slate-950/80',
-        isToday     && 'ring-2 ring-accent shadow-md',
-      )}
+    <motion.aside
+      key={day.dateStr}
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04]"
     >
-      {/* Gradient bar */}
-      <div className={cn('absolute inset-x-0 top-0 h-9 bg-gradient-to-r', style.bar)} />
+      {/* Dark gradient header */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-5 text-white">
+        <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-sky-400/20 blur-3xl" />
+        <div className="absolute -bottom-20 left-10 h-40 w-40 rounded-full bg-amber-300/10 blur-3xl" />
 
-      {/* Header row */}
-      <div className="relative z-10 flex items-center justify-between">
-        <span className={cn(
-          'grid h-8 w-8 place-items-center rounded-lg border border-white/70 bg-white text-sm font-black shadow-sm',
-          isToday && 'bg-accent text-accent-fg border-accent/30',
-        )}>
-          {String(item.date).padStart(2, '0')}
-        </span>
-        <div className="flex items-center gap-1 text-white/90">
-          {item.type === 'flight' &&
-            Array.from({ length: Math.min(item.sectors.length || 1, 3) }).map((_, i) => (
-              <Plane key={i} size={12} />
-            ))
-          }
-          {item.continues && <ChevronRight size={14} strokeWidth={3} />}
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'grid h-14 w-14 place-items-center rounded-2xl shadow-lg',
+              isToday ? 'bg-accent' : 'bg-white',
+            )}>
+              <span className={cn('text-2xl font-black tracking-tight', isToday ? 'text-white' : 'text-slate-950')}>
+                {day.date}
+              </span>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/45">{monthYear}</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">{day.label}</h2>
+              {isToday && (
+                <span className="mt-1 inline-block rounded-full bg-accent/30 px-2 py-0.5 text-[10px] font-black text-white">
+                  Today
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/80 ring-1 ring-white/10 shrink-0">
+            {sectorCount > 0 ? `${sectorCount} leg${sectorCount > 1 ? 's' : ''}` : 'No sector'}
+          </div>
+        </div>
+
+        <div className="relative mt-5 grid grid-cols-3 gap-2">
+          <InfoPill icon={<MapPin className="h-3.5 w-3.5" />} label="Base" value={day.base} />
+          <InfoPill
+            icon={<Clock3 className="h-3.5 w-3.5" />}
+            label="Duty"
+            value={day.dutyStart && day.dutyEnd ? `${day.dutyStart} – ${day.dutyEnd}` : '—'}
+          />
+          <InfoPill
+            icon={day.continuesNextDay ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+            label="Return"
+            value={day.continuesNextDay ? 'Next day' : 'Same day'}
+          />
         </div>
       </div>
 
       {/* Body */}
-      <div className="mt-8 space-y-2">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            {item.day}
-          </span>
-          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', style.badge)}>
-            {TYPE_LABEL[item.type]}
-          </span>
+      <div className="p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Crew status</p>
+            <p className="mt-1 text-lg font-black text-slate-900">{day.crewStatus ?? 'Operating'}</p>
+          </div>
+          <div className="rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">
+            <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />Synced
+          </div>
         </div>
 
-        {/* Off / Training */}
-        {(item.type === 'off' || item.type === 'training') && (
-          <div className="grid place-items-center py-2">
-            <div className={cn('text-2xl font-black', style.text)}>{item.code || '—'}</div>
-            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-              <MapPin size={11} />{item.home}
-            </div>
-          </div>
-        )}
-
-        {/* Blank / Rest */}
-        {item.type === 'blank' && (
-          <div className="flex h-12 items-center justify-center rounded-2xl border border-dashed border-slate-300 text-[11px] font-semibold text-slate-400">
-            Rest
-          </div>
-        )}
-
-        {/* Flight / Standby with sectors */}
-        {(item.type === 'flight' || item.type === 'standby') && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-1 text-[11px] text-slate-600">
-              <span>{item.start}</span>
-              <span className={cn('text-[15px] font-black', style.text)}>{item.code}</span>
-              <span>{item.end}</span>
-            </div>
-            {item.sectors.slice(0, 2).map((s, i) => (
-              <div
-                key={`${item.dateStr}-${s.flight}-${i}`}
-                className="rounded-2xl bg-white/70 px-2.5 py-1.5 shadow-sm ring-1 ring-black/5"
-              >
-                <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
-                  <span>{s.depart}</span>
-                  <span className="text-slate-800">{s.flight}</span>
-                  <span>{s.arrive}</span>
+        {sectorCount > 0 ? (
+          <div className="space-y-3">
+            {day.sectors.map((s, i) => (
+              <div key={s.id} className="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-[11px] font-black text-slate-500 shadow-sm ring-1 ring-slate-100">
+                      {i + 1}
+                    </span>
+                    <span className="text-[14px] font-black text-emerald-700">{s.flightNo}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-400 ring-1 ring-slate-100">
+                      {s.workType}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-400">{s.aircraft !== '—' ? s.aircraft : ''}</span>
                 </div>
-                <div className="mt-0.5 flex items-center justify-between text-[11px] font-black text-slate-800">
-                  <span>{s.from}</span>
-                  <Plane size={10} className="text-slate-400" />
-                  <span>{s.to}</span>
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <AirportBlock code={s.dep} time={s.depTime} align="left" />
+                  <div className="flex items-center gap-1 text-slate-300">
+                    <span className="h-px w-4 bg-slate-200" />
+                    <Plane className="h-4 w-4 text-sky-500" />
+                    <span className="h-px w-4 bg-slate-200" />
+                  </div>
+                  <AirportBlock code={s.arr} time={s.arrTime} align="right" />
                 </div>
               </div>
             ))}
-            {item.sectors.length > 2 && (
-              <p className="text-center text-[10px] font-bold text-slate-500">
-                +{item.sectors.length - 2} more sector{item.sectors.length - 2 > 1 ? 's' : ''}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-[13px] font-bold text-slate-600">
+              {day.type === 'off'      ? `Day off at ${day.base}` :
+               day.type === 'training' ? `Ground / training duty at ${day.base}` :
+               day.type === 'standby'  ? `Standby at ${day.base}` :
+               'No duty scheduled'}
+            </p>
+            {day.dutyStart && (
+              <p className="mt-1 text-[11px] text-slate-400 font-bold">
+                {day.dutyStart} – {day.dutyEnd}
               </p>
             )}
           </div>
         )}
       </div>
-    </motion.button>
+    </motion.aside>
   );
 }
 
-// ─── Detail Panel ─────────────────────────────────────────────────────────────
+// ─── Hero / today status label ────────────────────────────────────────────────
 
-function DetailPanel({
-  item,
-  onClose,
-}: {
-  item: CardItem;
-  onClose: () => void;
-}) {
-  const style = TYPE_STYLES[item.type];
-
-  return (
-    <motion.div
-      key={item.dateStr}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      transition={{ duration: 0.18 }}
-      className="sticky bottom-4 z-20 mx-auto mt-4 w-full rounded-[2rem] border border-white/70 bg-white/95 p-4 shadow-2xl shadow-slate-900/15 backdrop-blur-md"
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={cn('rounded-xl px-3 py-1 text-sm font-black', style.badge)}>
-              {String(item.date).padStart(2, '0')} {item.day}
-            </span>
-            {item.type === 'flight' && item.work && (
-              <span className="rounded-xl bg-slate-100 px-3 py-1 text-sm font-bold text-slate-600">
-                {item.work}
-              </span>
-            )}
-            {item.continues && (
-              <span className="rounded-xl bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700 flex items-center gap-1">
-                <ChevronRight size={13} strokeWidth={3} /> Continues next day
-              </span>
-            )}
-          </div>
-          <h2 className="mt-2 text-xl font-black tracking-tight text-slate-950">
-            {item.code || 'Open Day'}
-          </h2>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {item.start && item.end
-              ? `${item.work ? `${item.work} · ` : ''}${item.start} → ${item.end}`
-              : `Base: ${item.home}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white">
-            {item.type === 'off'      ? <Coffee size={18} />     :
-             item.type === 'training' ? <BadgeCheck size={18} /> :
-             item.type === 'standby'  ? <Clock size={18} />      :
-             <Plane size={18} />}
-          </div>
-          <button
-            onClick={onClose}
-            className="grid h-11 w-11 place-items-center rounded-2xl border border-border bg-surface-2 text-text-muted hover:bg-white transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Sectors */}
-      {item.sectors.length > 0 ? (
-        <div className="mt-4 grid gap-2 grid-cols-1 sm:grid-cols-2">
-          {item.sectors.map((s, i) => (
-            <div
-              key={`${s.flight}-${i}`}
-              className="rounded-3xl bg-slate-50 p-3 ring-1 ring-slate-200"
-            >
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-3">
-                <span>Sector {i + 1}</span>
-                <span className="font-black text-slate-700">{s.flight}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[20px] font-black text-slate-950 leading-none">{s.from}</p>
-                  <p className="text-[11px] font-semibold text-slate-500 mt-1">{cityName(s.from)}</p>
-                  <p className="text-[13px] font-black text-slate-700 mt-1">{s.depart}</p>
-                </div>
-                <div className="flex flex-1 items-center gap-2 text-slate-300">
-                  <span className="h-px flex-1 bg-slate-300" />
-                  <Plane size={16} className="text-slate-400" />
-                  <span className="h-px flex-1 bg-slate-300" />
-                </div>
-                <div className="text-right">
-                  <p className="text-[20px] font-black text-slate-950 leading-none">{s.to}</p>
-                  <p className="text-[11px] font-semibold text-slate-500 mt-1">{cityName(s.to)}</p>
-                  <p className="text-[13px] font-black text-slate-700 mt-1">{s.arrive}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-4 rounded-3xl bg-slate-50 p-4 text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
-          {item.type === 'off'
-            ? `Rest day at ${item.home}.`
-            : item.type === 'blank'
-            ? 'No duty scheduled.'
-            : `${item.code || 'Duty'} at ${item.home}.`}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-// ─── Hero status (today) ──────────────────────────────────────────────────────
-
-function buildHeroLabel(rosters: SharedRoster[], now: DateTime, base: string): {
-  label: string; sub: string; tag: string; grad: string;
-} {
+function getTodayLabel(rosters: SharedRoster[], now: DateTime, base: string): string {
   const todayStr = now.toFormat('yyyy-MM-dd');
   const nowTime  = now.toFormat('HH:mm');
-  const allEvts  = rosters.flatMap(r => r.events ?? []);
-  const today    = allEvts.filter(e => e.date === todayStr);
+  const all      = rosters.flatMap(r => r.events ?? []);
+  const today    = all.filter(e => e.date === todayStr);
 
-  const flying = today.find(
-    e => e.type === 'FLIGHT' && e.std && e.sta && nowTime >= e.std && nowTime <= e.sta,
+  const flying = today.find(e =>
+    e.type === 'FLIGHT' && e.std && e.sta && nowTime >= e.std && nowTime <= e.sta,
   );
-  if (flying) return {
-    label: 'In the Air',
-    sub:   `${cityName(flying.depPort)} → ${cityName(flying.arrPort)}`,
-    tag:   flying.sta ? `Lands at ${flying.sta} local` : 'Currently flying',
-    grad:  'from-sky-600 to-cyan-500',
-  };
+  if (flying) return `In the air · ${cityName(flying.depPort)} → ${cityName(flying.arrPort)}`;
 
-  if (today.find(e => e.type === 'LAYOVER')) {
-    const lay = today.find(e => e.type === 'LAYOVER')!;
-    return {
-      label: 'On Layover', sub: cityName(lay.arrPort) || 'Away',
-      tag: '', grad: 'from-indigo-600 to-purple-500',
-    };
-  }
+  if (today.find(e => e.type === 'LAYOVER')) return 'On layover';
 
-  const sby = today.find(e => e.type === 'STANDBY' && e.signOn && e.signOff
-    && nowTime >= e.signOn! && nowTime <= e.signOff!);
-  if (sby) return {
-    label: 'On Standby', sub: `Until ${sby.signOff}`,
-    tag: 'May be called for a flight', grad: 'from-amber-500 to-yellow-400',
-  };
+  const sby = today.find(e =>
+    e.type === 'STANDBY' && e.signOn && e.signOff && nowTime >= e.signOn! && nowTime <= e.signOff!,
+  );
+  if (sby) return `On standby until ${sby.signOff}`;
 
-  // Find next trip
-  const sorted = Array.from(new Set(allEvts.map(e => e.date))).sort();
-  const next = sorted.find(d => d > todayStr && ['FLIGHT','STANDBY','LAYOVER'].includes(
-    allEvts.filter(e => e.date === d)[0]?.type,
-  ));
+  const next = Array.from(new Set(all.map(e => e.date)))
+    .sort()
+    .find(d => d > todayStr && ['FLIGHT', 'STANDBY', 'LAYOVER'].includes(
+      all.find(e => e.date === d)?.type ?? '',
+    ));
   const daysTo = next ? Math.ceil(DateTime.fromISO(next).diff(now, 'days').days) : null;
-
-  return {
-    label: 'At Home',
-    sub:   cityName(base) || base,
-    tag:   daysTo != null ? (daysTo <= 1 ? 'Next trip tomorrow' : `Next trip in ${daysTo} days`) : 'No upcoming trips',
-    grad:  'from-emerald-600 to-lime-500',
-  };
+  return daysTo != null
+    ? daysTo <= 1 ? 'At home · Next trip tomorrow' : `At home · Next trip in ${daysTo} days`
+    : `At home · ${cityName(base) || base}`;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-
-const FILTERS: { key: CardType | 'all'; label: string }[] = [
-  { key: 'all',      label: 'All'      },
-  { key: 'flight',   label: 'Flight'   },
-  { key: 'off',      label: 'Off'      },
-  { key: 'standby',  label: 'Standby'  },
-  { key: 'training', label: 'Training' },
-];
-
-const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function SpouseViewClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [apiData, setApiData]           = useState<{ pilot: PilotInfo; rosters: SharedRoster[] } | null>(null);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState<string | null>(null);
-  const [now, setNow]                   = useState(() => DateTime.now());
-  const [selectedIdx, setSelectedIdx]   = useState(0);
-  const [selected, setSelected]         = useState<CardItem | null>(null);
-  const [filter, setFilter]             = useState<CardType | 'all'>('all');
+  const [apiData, setApiData]         = useState<{ pilot: PilotInfo; rosters: SharedRoster[] } | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [now, setNow]                 = useState(() => DateTime.now());
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [activeDate, setActiveDate]   = useState<number | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(DateTime.now()), 60_000);
@@ -523,41 +463,58 @@ export default function SpouseViewClient() {
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Failed to load');
+        // Auto-select today's month if available
+        const rosters: SharedRoster[] = json.rosters ?? [];
+        const todayMonth = now.toFormat('MMMM');
+        const todayYear  = now.toFormat('yyyy');
+        const todayIdx   = rosters.findIndex(r => r.month === todayMonth && r.year === todayYear);
+        if (todayIdx >= 0) setSelectedIdx(todayIdx);
         setApiData(json);
       })
       .catch(err => setError(String(err?.message ?? err)))
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const roster = apiData?.rosters[selectedIdx];
+  const roster   = apiData?.rosters[selectedIdx];
+  const todayStr = now.toFormat('yyyy-MM-dd');
 
-  const cards = useMemo(
-    () => roster ? buildRosterCards(roster, apiData?.pilot.base ?? 'KUL') : [],
+  const rosterDays = useMemo(
+    () => roster ? buildRosterDays(roster, apiData?.pilot.base ?? 'KUL') : [],
     [roster, apiData?.pilot.base],
   );
 
+  const dayMap = useMemo(
+    () => new Map(rosterDays.map(d => [d.date, d])),
+    [rosterDays],
+  );
+
+  const calCells = useMemo(
+    () => roster ? buildCalendarCells(roster) : [],
+    [roster],
+  );
+
+  const activeDay = useMemo(() => {
+    if (activeDate) return dayMap.get(activeDate) ?? null;
+    // Default to today if today is in this month, else first duty day
+    const todayDay = now.day;
+    const inThisMonth = roster
+      ? now.toFormat('MMMM yyyy') === `${roster.month} ${roster.year}`
+      : false;
+    if (inThisMonth && dayMap.has(todayDay)) return dayMap.get(todayDay)!;
+    return rosterDays.find(d => d.type !== 'rest') ?? rosterDays[0] ?? null;
+  }, [activeDate, dayMap, rosterDays, roster, now]);
+
   const stats = useMemo(() => ({
-    flights:  cards.filter(c => c.type === 'flight').length,
-    sectors:  cards.reduce((n, c) => n + c.sectors.length, 0),
-    offDays:  cards.filter(c => c.type === 'off').length,
-  }), [cards]);
-
-  const hero = useMemo(
-    () => apiData ? buildHeroLabel(apiData.rosters, now, apiData.pilot.base) : null,
-    [apiData, now],
-  );
-
-  const todayStr = now.toFormat('yyyy-MM-dd');
-
-  const filtered = useMemo(
-    () => filter === 'all' ? cards : cards.filter(c => c.type === filter),
-    [cards, filter],
-  );
+    flights:  rosterDays.filter(d => d.type === 'flight').length,
+    standby:  rosterDays.filter(d => d.type === 'standby').length,
+    sectors:  rosterDays.reduce((n, d) => n + d.sectors.length, 0),
+  }), [rosterDays]);
 
   // ── Loading ──
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f6f7f5] gap-3">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#ededed] gap-3">
         <Loader2 size={28} className="animate-spin text-sky-600" />
         <p className="text-[12px] font-black uppercase tracking-[0.3em] text-slate-500">Loading roster…</p>
       </div>
@@ -565,9 +522,9 @@ export default function SpouseViewClient() {
   }
 
   // ── Error ──
-  if (error || !apiData || !roster || !hero) {
+  if (error || !apiData || !roster) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f6f7f5] p-8 text-center gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#ededed] p-8 text-center gap-4">
         <div className="w-20 h-20 rounded-[2rem] bg-red-50 flex items-center justify-center">
           <AlertCircle size={36} className="text-red-500" />
         </div>
@@ -583,7 +540,7 @@ export default function SpouseViewClient() {
         </div>
         <button
           onClick={() => window.location.reload()}
-          className="px-6 py-3 rounded-full border border-slate-200 text-[13px] font-black text-slate-500 hover:text-slate-900 bg-white"
+          className="px-6 py-3 rounded-full border border-slate-200 bg-white text-[13px] font-black text-slate-500 hover:text-slate-900"
         >
           Try again
         </button>
@@ -592,154 +549,172 @@ export default function SpouseViewClient() {
   }
 
   const { pilot, rosters } = apiData;
+  const monthYear = `${roster.month} ${roster.year}`;
+  const todayLabel = getTodayLabel(rosters, now, pilot.base);
 
   return (
-    <main className="min-h-screen bg-[#f6f7f5] px-4 py-6 text-slate-950">
-      <div className="mx-auto max-w-7xl space-y-4">
+    <main className="min-h-screen bg-[#ededed] px-3 py-6 text-slate-950">
+      <div className="mx-auto w-full max-w-7xl space-y-4">
 
-        {/* ── Header ── */}
-        <header className="overflow-hidden rounded-[2rem] bg-slate-950 p-5 text-white shadow-xl shadow-slate-900/15">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        {/* ── Top header ── */}
+        <header className="rounded-[2rem] border border-black/10 bg-[#f7f7f7] p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className={cn(
-                'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em]',
-                `bg-gradient-to-r ${hero.grad} bg-clip-text text-transparent`,
-              )}>
-                <CalendarDays size={13} className="text-white/60" />
-                <span className="text-white/70">{hero.label}</span>
-                {hero.sub && <span className="text-white/50">· {hero.sub}</span>}
-              </div>
-              <h1 className="mt-3 text-2xl font-black tracking-tight md:text-4xl">
-                {pilot.full_name}
-                {pilot.rank && <span className="ml-2 text-white/50 font-bold text-lg">{pilot.rank}</span>}
+              <p className="text-[10px] font-black uppercase tracking-[0.42em] text-slate-400">Crew roster</p>
+              <h1 className="mt-1 text-2xl font-black tracking-[0.12em] text-zinc-800 sm:text-3xl uppercase">
+                {monthYear}
               </h1>
-              <p className="mt-1 text-[13px] text-white/55 font-bold">
-                {roster.month} {roster.year} Duty Roster
-                {hero.tag && <span className="ml-2 text-amber-400">· {hero.tag}</span>}
-              </p>
+              <p className="mt-1 text-[12px] font-bold text-slate-400">{pilot.full_name}{pilot.rank ? ` · ${pilot.rank}` : ''} · {todayLabel}</p>
             </div>
-            <div className="grid grid-cols-3 gap-2 md:min-w-72">
-              {[
-                { n: stats.flights,  label: 'Flight days' },
-                { n: stats.sectors,  label: 'Sectors'     },
-                { n: stats.offDays,  label: 'Off days'    },
-              ].map(s => (
-                <div key={s.label} className="rounded-3xl bg-white/10 p-3 text-center">
-                  <p className="text-2xl font-black">{s.n}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">{s.label}</p>
+            <div className="flex items-center gap-2">
+              {/* Month picker */}
+              {rosters.length > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={selectedIdx >= rosters.length - 1}
+                    onClick={() => { setSelectedIdx(i => i + 1); setActiveDate(null); }}
+                    className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center disabled:opacity-30 shadow-sm"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    disabled={selectedIdx <= 0}
+                    onClick={() => { setSelectedIdx(i => i - 1); setActiveDate(null); }}
+                    className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center disabled:opacity-30 shadow-sm"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
-              ))}
+              )}
+              <div className="inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 text-[12px] font-black text-green-700">
+                <Check className="h-4 w-4" /> Synced
+              </div>
             </div>
           </div>
         </header>
 
-        {/* ── Month picker (only if > 1 month uploaded) ── */}
-        {rosters.length > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              disabled={selectedIdx >= rosters.length - 1}
-              onClick={() => { setSelectedIdx(i => i + 1); setSelected(null); }}
-              className="w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center disabled:opacity-30 shadow-sm"
-            >
-              <ChevronLeft size={15} />
-            </button>
-            <div className="flex-1 overflow-x-auto scrollbar-hide">
-              <div className="flex gap-2 justify-center">
-                {rosters.map((r, idx) => (
-                  <button
-                    key={`${r.month}-${r.year}`}
-                    onClick={() => { setSelectedIdx(idx); setSelected(null); }}
-                    className={cn(
-                      'px-4 py-2 rounded-full text-[12px] font-black whitespace-nowrap transition-all shadow-sm',
-                      idx === selectedIdx
-                        ? 'bg-slate-950 text-white'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50',
-                    )}
-                  >
-                    {r.month} {r.year}
-                  </button>
+        {/* ── Two-column layout ── */}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+
+          {/* LEFT — calendar + stats */}
+          <div className="space-y-4">
+
+            {/* Calendar grid */}
+            <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm sm:p-6">
+              {/* DOW headers */}
+              <div className="mb-3 grid grid-cols-7 gap-1.5 text-center sm:gap-2">
+                {DOW.map(d => (
+                  <div key={d} className="text-[9px] font-black uppercase tracking-widest text-zinc-300 sm:text-[10px] py-1">
+                    {d}
+                  </div>
                 ))}
               </div>
-            </div>
-            <button
-              disabled={selectedIdx <= 0}
-              onClick={() => { setSelectedIdx(i => i - 1); setSelected(null); }}
-              className="w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center disabled:opacity-30 shadow-sm"
-            >
-              <ChevronRight size={15} />
-            </button>
-          </div>
-        )}
 
-        {/* ── Filter tabs ── */}
-        <section className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => { setFilter(f.key); setSelected(null); }}
-              className={cn(
-                'whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-bold transition-all shadow-sm',
-                filter === f.key
-                  ? 'bg-slate-950 text-white shadow-slate-900/20'
-                  : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50',
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </section>
+              {/* Day cells */}
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                {calCells.map((date, idx) => {
+                  if (!date) return <div key={`pad-${idx}`} className="aspect-square" />;
 
-        {/* ── Desktop DOW header ── */}
-        {filter === 'all' && (
-          <div className="hidden grid-cols-7 gap-2 lg:grid">
-            {DOW.map(d => (
-              <div key={d} className="rounded-2xl bg-[#7c1d0c] px-3 py-2 text-center text-[13px] font-black uppercase tracking-wide text-white">
-                {d}
+                  const day   = dayMap.get(date);
+                  const type  = day?.type ?? 'rest';
+                  const hasDuty = !!day && type !== 'rest';
+                  const isActive = activeDate === date || (!activeDate && activeDay?.date === date);
+                  const dateStr  = roster
+                    ? DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy')
+                        .set({ day: date }).toFormat('yyyy-MM-dd')
+                    : '';
+                  const isToday = dateStr === todayStr;
+
+                  return (
+                    <motion.button
+                      key={date}
+                      type="button"
+                      onMouseEnter={() => setActiveDate(date)}
+                      onClick={() => setActiveDate(prev => prev === date ? null : date)}
+                      whileHover={{ y: -2 }}
+                      className={cn(
+                        'group relative aspect-square rounded-[1.2rem] transition-all sm:rounded-[1.5rem]',
+                        hasDuty
+                          ? isActive ? CELL_ACTIVE[type] : CELL_IDLE[type]
+                          : isToday
+                            ? 'bg-accent/15 ring-1 ring-accent text-accent hover:bg-accent/25'
+                            : 'bg-transparent text-zinc-300 hover:bg-zinc-100',
+                        isActive && hasDuty ? 'scale-105 z-10' : '',
+                      )}
+                    >
+                      <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                        <span className="text-[14px] font-black tracking-tight sm:text-[18px] leading-none">
+                          {date}
+                        </span>
+                        {hasDuty ? (
+                          <>
+                            <span className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-white/70' : DOT[type])} />
+                            <span className="hidden text-[8px] font-black uppercase tracking-wider opacity-70 sm:block leading-none">
+                              {day?.sectors.length && day.sectors.length > 0 ? `${day.sectors.length}×` : day?.label}
+                            </span>
+                          </>
+                        ) : (
+                          isToday && <span className="h-1.5 w-1.5 rounded-full bg-accent/50" />
+                        )}
+                      </div>
+                      {day?.continuesNextDay && (
+                        <span className="absolute bottom-1 right-1 rounded-full bg-white/80 p-0.5 text-slate-500 shadow-sm">
+                          <ChevronRight className="h-2.5 w-2.5" />
+                        </span>
+                      )}
+                    </motion.button>
+                  );
+                })}
               </div>
-            ))}
+            </section>
+
+            {/* Stats */}
+            <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm sm:p-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Summary icon={<CalendarDays className="h-4 w-4" />} label="Month"       value={monthYear} />
+                <Summary icon={<Plane className="h-4 w-4" />}        label="Flight days"  value={String(stats.flights)} />
+                <Summary icon={<Clock3 className="h-4 w-4" />}       label="Standby"      value={String(stats.standby)} />
+                <Summary icon={<MapPin className="h-4 w-4" />}       label="Sectors"      value={String(stats.sectors)} />
+              </div>
+            </section>
+
+            {/* Legend */}
+            <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-[11px] font-bold text-slate-600">
+                <div className="flex items-center gap-2 rounded-2xl bg-sky-100 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-sky-500 shrink-0" />Blue = Flight
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-amber-100 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-amber-500 shrink-0" />Yellow = Standby
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-emerald-100 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-emerald-500 shrink-0" />Green = Day off
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-fuchsia-100 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-fuchsia-500 shrink-0" />Purple = Training
+                </div>
+              </div>
+            </section>
           </div>
-        )}
 
-        {/* ── Card grid ── */}
-        <section className={cn(
-          'grid gap-3',
-          filter === 'all'
-            ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 lg:gap-2'
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-        )}>
-          {filtered.map(item => (
-            <RosterCard
-              key={item.dateStr}
-              item={item}
-              isSelected={selected?.dateStr === item.dateStr}
-              isToday={item.dateStr === todayStr}
-              onClick={() => setSelected(prev => prev?.dateStr === item.dateStr ? null : item)}
-            />
-          ))}
-        </section>
-
-        {/* ── Detail panel ── */}
-        <AnimatePresence>
-          {selected && (
-            <DetailPanel item={selected} onClose={() => setSelected(null)} />
-          )}
-        </AnimatePresence>
-
-        {/* ── Legend ── */}
-        <section className="rounded-[2rem] bg-white p-4 ring-1 ring-slate-200 shadow-sm">
-          <h3 className="text-[13px] font-black text-slate-950 mb-3">Legend</h3>
-          <div className="grid gap-2 text-[12px] text-slate-600 grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl bg-sky-50 p-2.5"><b className="text-sky-800">Blue</b> — Flight duty with sectors</div>
-            <div className="rounded-2xl bg-emerald-50 p-2.5"><b className="text-emerald-800">Green</b> — Day off (D / DO)</div>
-            <div className="rounded-2xl bg-yellow-50 p-2.5"><b className="text-yellow-800">Yellow</b> — Standby block</div>
-            <div className="rounded-2xl bg-fuchsia-50 p-2.5"><b className="text-fuchsia-800">Purple</b> — Training / ground</div>
+          {/* RIGHT — sticky detail card */}
+          <div className="lg:sticky lg:top-6">
+            <AnimatePresence mode="wait">
+              {activeDay && (
+                <RosterDetailCard
+                  key={activeDay.dateStr}
+                  day={activeDay}
+                  monthYear={monthYear}
+                  todayStr={todayStr}
+                />
+              )}
+            </AnimatePresence>
           </div>
-        </section>
+        </div>
 
-        <p className="text-center text-[11px] font-bold text-slate-400 pb-4">
+        <p className="text-center text-[11px] font-bold text-slate-400 pb-2">
           Shared via Otarosta · Live read-only view
         </p>
-
       </div>
     </main>
   );
