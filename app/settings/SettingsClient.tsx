@@ -558,69 +558,71 @@ export default function SettingsClient() {
         </div>
       )}
 
-      {/* ── Spouse Share ── */}
+      {/* ── Family Sharing ── */}
       {!isOnboarding && (
-        <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
+        <div className="mt-6 bg-white border border-border rounded-[2rem] p-6 shadow-sm">
+          <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono mb-4">
             Family Sharing
-          </div>
-          <div>
-            <p className="text-[13px] font-black text-text flex items-center gap-2">
-              <Share2 size={14} className="text-accent" />
-              Spouse & Family View
-            </p>
-            <p className="text-[12px] text-text-muted font-bold mt-1 leading-snug">
-              Share a live, read-only view of your roster with your spouse or family.
-              They can see where you are and when you&apos;re coming home.
-            </p>
           </div>
 
           {shareToken ? (
-            <div className="space-y-4 pt-2">
-              <div className="relative">
-                <input
-                  readOnly
-                  value={shareUrl}
-                  className={`${inputCls} pr-12 font-mono text-[11px] bg-surface-1`}
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-accent hover:text-accent-hover transition-colors"
-                >
-                  {copied ? <Check size={16} /> : <Copy size={16} />}
-                </button>
+            <div className="space-y-3">
+              {/* Illustration strip */}
+              <div className="w-full rounded-2xl bg-gradient-to-br from-accent/8 to-accent/4 border border-accent/10 p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0">
+                  <Share2 size={22} className="text-accent" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-black text-text leading-tight">Link active</p>
+                  <p className="text-[11px] font-bold text-text-muted mt-0.5 leading-snug">
+                    Your family can see your live roster — where you are and when you&apos;re home.
+                  </p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={handleWhatsAppShare}
-                  className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#25D366] text-white text-[13px] font-black hover:opacity-90 transition-opacity"
-                >
-                  <MessageCircle size={16} />
-                  WhatsApp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(true)}
-                  className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-danger/20 text-danger text-[13px] font-black hover:bg-danger/5 transition-colors"
-                >
-                  <RefreshCw size={14} />
-                  Reset link
-                </button>
-              </div>
+              {/* Primary: WhatsApp */}
+              <button
+                type="button"
+                onClick={handleWhatsAppShare}
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-[#25D366] text-white text-[14px] font-black hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#25D366]/20"
+              >
+                <MessageCircle size={18} />
+                Send via WhatsApp
+              </button>
+
+              {/* Secondary: Copy */}
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-surface-2 border border-border text-[14px] font-black text-text hover:bg-white transition-all"
+              >
+                {copied ? <Check size={18} className="text-success" /> : <Copy size={18} />}
+                {copied ? 'Copied!' : 'Copy link'}
+              </button>
+
+              {/* Danger: Reset */}
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-black text-danger/70 hover:text-danger transition-colors"
+              >
+                <RefreshCw size={13} />
+                Reset link
+              </button>
             </div>
           ) : (
-            <div className="pt-2">
+            <div className="space-y-3">
+              <p className="text-[12px] font-bold text-text-muted leading-snug">
+                Generate a private link so your family can see your live roster — no account needed.
+              </p>
               <button
                 type="button"
                 onClick={handleResetToken}
                 disabled={isResetting}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-surface-2 border border-border text-[13px] font-black text-text hover:bg-white transition-all disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-accent text-accent-fg text-[14px] font-black hover:opacity-90 transition-all disabled:opacity-60 shadow-lg shadow-accent/20"
               >
-                {isResetting ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
-                Generate Share Link
+                {isResetting ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
+                Create Share Link
               </button>
             </div>
           )}

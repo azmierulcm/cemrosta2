@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       pilot: {
-        full_name: profileData.full_name || 'Pilot',
-        rank: profileData.rank,
-        airline: profileData.airline,
+        full_name:  profileData.full_name || 'Pilot',
+        rank:       profileData.rank,
+        airline:    profileData.airline,
+        avatar_url: profileData.avatar_url ?? null,
+        base:       profileData.base ?? 'KUL',
       },
       roster: rosterData,
     });

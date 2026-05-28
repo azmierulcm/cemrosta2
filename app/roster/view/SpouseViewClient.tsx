@@ -3,300 +3,487 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DateTime } from 'luxon';
-import {
-  Plane, Clock, Calendar, AlertCircle, Loader2,
-  ChevronRight, Building2, User2,
-} from 'lucide-react';
-import type { RosterData } from '@/lib/types';
+import { Plane, Clock, Home, AlertCircle, Loader2, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { getAirportMeta } from '@/lib/utils/destinations';
+import type { DutyEvent, RosterData } from '@/lib/types';
 
 interface PilotInfo {
   full_name: string;
   rank?: string;
   airline?: string;
+  avatar_url?: string;
+  base?: string;
 }
+
+type DayStatus = 'HOME' | 'FLIGHT' | 'LAYOVER' | 'STANDBY' | 'DUTY';
+
+function cityName(iata?: string): string {
+  if (!iata) return '';
+  return getAirportMeta(iata).city;
+}
+
+function getDayStatus(dayEvents: DutyEvent[]): DayStatus {
+  if (dayEvents.some(e => e.type === 'FLIGHT')) return 'FLIGHT';
+  if (dayEvents.some(e => e.type === 'LAYOVER')) return 'LAYOVER';
+  if (dayEvents.some(e => e.type === 'STANDBY')) return 'STANDBY';
+  if (dayEvents.some(e => e.type === 'TRAINING' || e.type === 'GROUND')) return 'DUTY';
+  return 'HOME';
+}
+
+function dayStatusColor(status: DayStatus, isToday: boolean): string {
+  if (isToday) {
+    const base: Record<DayStatus, string> = {
+      FLIGHT:  'bg-sky-500 text-white ring-4 ring-sky-200',
+      LAYOVER: 'bg-indigo-500 text-white ring-4 ring-indigo-200',
+      STANDBY: 'bg-amber-500 text-white ring-4 ring-amber-200',
+      DUTY:    'bg-purple-500 text-white ring-4 ring-purple-200',
+      HOME:    'bg-emerald-500 text-white ring-4 ring-emerald-200',
+    };
+    return base[status];
+  }
+  const base: Record<DayStatus, string> = {
+    FLIGHT:  'bg-sky-100 text-sky-700',
+    LAYOVER: 'bg-indigo-100 text-indigo-700',
+    STANDBY: 'bg-amber-100 text-amber-700',
+    DUTY:    'bg-purple-100 text-purple-700',
+    HOME:    'bg-emerald-50 text-emerald-700',
+  };
+  return base[status];
+}
+
+interface Trip {
+  startDate: DateTime;
+  endDate: DateTime;
+  cities: string[];
+}
+
+function groupUpcomingTrips(events: DutyEvent[], now: DateTime): Trip[] {
+  const eventsByDate = new Map<string, DutyEvent[]>();
+  for (const e of events) {
+    const list = eventsByDate.get(e.date) ?? [];
+    list.push(e);
+    eventsByDate.set(e.date, list);
+  }
+
+  const trips: Trip[] = [];
+  let current: Trip | null = null;
+
+  const dates = Array.from(new Set(events.map(e => e.date))).sort();
+
+  for (const dateStr of dates) {
+    const dt = DateTime.fromISO(dateStr);
+    if (dt < now.startOf('day')) continue;
+
+    const dayEvts = eventsByDate.get(dateStr) ?? [];
+    const status = getDayStatus(dayEvts);
+
+    if (status === 'HOME') {
+      if (current) { trips.push(current); current = null; }
+      continue;
+    }
+
+    const awayCities = dayEvts
+      .filter(e => e.type === 'FLIGHT' || e.type === 'LAYOVER')
+      .flatMap(e => [e.arrPort].filter(Boolean) as string[])
+      .filter(c => c !== 'KUL')
+      .map(cityName)
+      .filter(Boolean);
+
+    if (!current) {
+      current = { startDate: dt, endDate: dt, cities: [...new Set(awayCities)] };
+    } else {
+      current.endDate = dt;
+      for (const c of awayCities) {
+        if (!current.cities.includes(c)) current.cities.push(c);
+      }
+    }
+  }
+  if (current) trips.push(current);
+  return trips.slice(0, 3);
+}
+
+function getDayDescription(dayEvents: DutyEvent[]): string {
+  const flights = dayEvents.filter(e => e.type === 'FLIGHT');
+  const layover = dayEvents.find(e => e.type === 'LAYOVER');
+  const standby = dayEvents.find(e => e.type === 'STANDBY');
+
+  if (flights.length > 0) {
+    const legs = flights.map(f => {
+      const from = cityName(f.depPort) || f.depPort || '?';
+      const to   = cityName(f.arrPort) || f.arrPort || '?';
+      const dep  = f.std ? ` · Departs ${f.std}` : '';
+      return `${from} → ${to}${dep}`;
+    });
+    return legs.join('\n');
+  }
+  if (layover) {
+    const city = cityName(layover.arrPort) || layover.arrPort;
+    const hotel = layover.hotel ? ` · ${layover.hotel}` : '';
+    return `Layover in ${city}${hotel}`;
+  }
+  if (standby) {
+    const times = standby.signOn && standby.signOff ? ` · ${standby.signOn}–${standby.signOff}` : '';
+    return `On standby${times}`;
+  }
+  return 'Day off · At home';
+}
+
+interface HeroStatus {
+  label: string;
+  subtitle: string;
+  tag: string;
+  bg: string;
+  icon: React.ElementType;
+}
+
+function computeHeroStatus(
+  events: DutyEvent[],
+  now: DateTime,
+  homeBase: string,
+): HeroStatus {
+  const todayStr = now.toFormat('yyyy-MM-dd');
+  const todayEvents = events.filter(e => e.date === todayStr);
+  const nowTime = now.toFormat('HH:mm');
+
+  const activeFlight = todayEvents.find(e => {
+    if (e.type !== 'FLIGHT' || !e.std || !e.sta) return false;
+    return nowTime >= e.std && nowTime <= e.sta;
+  });
+
+  if (activeFlight) {
+    const from = cityName(activeFlight.depPort) || activeFlight.depPort || '';
+    const to   = cityName(activeFlight.arrPort) || activeFlight.arrPort || '';
+    return {
+      label:    'In the Air',
+      subtitle: `${from} → ${to}`,
+      tag:      activeFlight.sta ? `Lands at ${activeFlight.sta} local` : 'Currently flying',
+      bg:       'from-sky-500 to-sky-600',
+      icon:     Plane,
+    };
+  }
+
+  const activeLayover = todayEvents.find(e => e.type === 'LAYOVER');
+  if (activeLayover) {
+    const city = cityName(activeLayover.arrPort) || activeLayover.arrPort || 'Away';
+    const nextHomeDay = findNextHomeDay(events, now);
+    const homeIn = nextHomeDay
+      ? nextHomeDay.hasSame(now.plus({ days: 1 }), 'day')
+        ? 'Back tomorrow'
+        : `Back in ${Math.ceil(nextHomeDay.diff(now, 'days').days)} days`
+      : '';
+    return {
+      label:    `On Layover`,
+      subtitle: city,
+      tag:      homeIn,
+      bg:       'from-indigo-500 to-indigo-600',
+      icon:     MapPin,
+    };
+  }
+
+  const activeStandby = todayEvents.find(e => {
+    if (e.type !== 'STANDBY' || !e.signOn || !e.signOff) return false;
+    return nowTime >= e.signOn && nowTime <= e.signOff;
+  });
+
+  if (activeStandby) {
+    return {
+      label:    'On Standby',
+      subtitle: `Available until ${activeStandby.signOff}`,
+      tag:      'May be called for a flight',
+      bg:       'from-amber-500 to-amber-600',
+      icon:     Clock,
+    };
+  }
+
+  const nextTrip = findNextTripDay(events, now);
+  const nextTripLabel = nextTrip
+    ? nextTrip.hasSame(now.plus({ days: 1 }), 'day')
+      ? 'Next trip tomorrow'
+      : `Next trip in ${Math.ceil(nextTrip.diff(now, 'days').days)} days`
+    : 'No upcoming trips';
+
+  const base = homeBase ? cityName(homeBase) || homeBase : 'Home Base';
+  return {
+    label:    'At Home',
+    subtitle: base,
+    tag:      nextTripLabel,
+    bg:       'from-emerald-500 to-emerald-600',
+    icon:     Home,
+  };
+}
+
+function findNextHomeDay(events: DutyEvent[], now: DateTime): DateTime | null {
+  const dates = Array.from(new Set(events.map(e => e.date))).sort();
+  const eventsByDate = new Map<string, DutyEvent[]>();
+  for (const e of events) {
+    const list = eventsByDate.get(e.date) ?? [];
+    list.push(e);
+    eventsByDate.set(e.date, list);
+  }
+  for (const dateStr of dates) {
+    const dt = DateTime.fromISO(dateStr);
+    if (dt <= now.startOf('day')) continue;
+    const status = getDayStatus(eventsByDate.get(dateStr) ?? []);
+    if (status === 'HOME') return dt;
+  }
+  return null;
+}
+
+function findNextTripDay(events: DutyEvent[], now: DateTime): DateTime | null {
+  const dates = Array.from(new Set(events.map(e => e.date))).sort();
+  const eventsByDate = new Map<string, DutyEvent[]>();
+  for (const e of events) {
+    const list = eventsByDate.get(e.date) ?? [];
+    list.push(e);
+    eventsByDate.set(e.date, list);
+  }
+  for (const dateStr of dates) {
+    const dt = DateTime.fromISO(dateStr);
+    if (dt <= now.startOf('day')) continue;
+    const status = getDayStatus(eventsByDate.get(dateStr) ?? []);
+    if (status !== 'HOME') return dt;
+  }
+  return null;
+}
+
+const DAY_HEADERS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function SpouseViewClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [data, setData] = useState<{ pilot: PilotInfo, roster: RosterData } | null>(null);
+  const [data, setData] = useState<{ pilot: PilotInfo; roster: RosterData } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(DateTime.now());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // Update clock every minute for status calculations
   useEffect(() => {
     const timer = setInterval(() => setNow(DateTime.now()), 60000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    if (!token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
-      setError('Missing share token');
-      return;
-    }
-
+    if (!token) { setLoading(false); setError('Missing share token'); return; }
     fetch(`/api/roster/share?token=${token}`)
-      .then(async (res) => {
+      .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed to load roster');
         setData(json);
       })
-      .catch((err) => setError(err.message))
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Status calculation logic
-  const currentStatus = useMemo(() => {
-    if (!data?.roster?.events) return null;
-
-    const events = data.roster.events;
-    const currentTime = now.toFormat('HH:mm');
-    const currentDate = now.toFormat('yyyy-MM-dd');
-
-    // Find if there's an event happening right now
-    const todayEvents = events.filter(e => e.date === currentDate);
-
-    // 1. Check for Active Flight
-    const activeFlight = todayEvents.find(e => {
-      if (e.type !== 'FLIGHT' || !e.std || !e.sta) return false;
-      return currentTime >= e.std && currentTime <= e.sta;
-    });
-
-    if (activeFlight) {
-      return {
-        type: 'FLIGHT',
-        label: 'CURRENT FLIGHT',
-        title: `${activeFlight.item || activeFlight.flightNumber} (${activeFlight.depPort} → ${activeFlight.arrPort})`,
-        detail: `Arr: ${activeFlight.sta} local`,
-        icon: Plane,
-        color: 'bg-accent text-accent-fg',
-      };
+  const eventsByDate = useMemo(() => {
+    if (!data) return new Map<string, DutyEvent[]>();
+    const map = new Map<string, DutyEvent[]>();
+    for (const e of data.roster.events) {
+      const list = map.get(e.date) ?? [];
+      list.push(e);
+      map.set(e.date, list);
     }
+    return map;
+  }, [data]);
 
-    // 2. Check for Layover
-    const activeLayover = todayEvents.find(e => e.type === 'LAYOVER');
-    if (activeLayover) {
-      return {
-        type: 'LAYOVER',
-        label: 'ON LAYOVER',
-        title: `${activeLayover.arrPort || 'Away Base'}`,
-        detail: activeLayover.hotel ? `at ${activeLayover.hotel}` : 'In hotel',
-        icon: Building2,
-        color: 'bg-indigo-600 text-white',
-      };
+  const heroStatus = useMemo(() => {
+    if (!data) return null;
+    return computeHeroStatus(data.roster.events, now, data.pilot.base ?? 'KUL');
+  }, [data, now]);
+
+  const calendarDays = useMemo(() => {
+    if (!data) return [];
+    const { month, year } = data.roster;
+    const start = DateTime.fromFormat(`${month} ${year}`, 'MMMM yyyy');
+    if (!start.isValid) return [];
+    const daysInMonth = start.daysInMonth ?? 30;
+    const firstDow = start.weekday % 7; // 0 = Sun
+
+    const days: Array<{ date: string; dayNum: number; status: DayStatus; isToday: boolean; isFuture: boolean } | null> = [];
+    for (let i = 0; i < firstDow; i++) days.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = start.set({ day: d });
+      const dateStr = dt.toFormat('yyyy-MM-dd');
+      const dayEvts = eventsByDate.get(dateStr) ?? [];
+      const status = getDayStatus(dayEvts);
+      days.push({
+        date: dateStr,
+        dayNum: d,
+        status,
+        isToday: dt.hasSame(now, 'day'),
+        isFuture: dt > now,
+      });
     }
+    return days;
+  }, [data, eventsByDate, now]);
 
-    // 3. Check for Standby
-    const activeStandby = todayEvents.find(e => {
-      if (e.type !== 'STANDBY' || !e.signOn || !e.signOff) return false;
-      return currentTime >= e.signOn && currentTime <= e.signOff;
-    });
-    if (activeStandby) {
-      return {
-        type: 'STANDBY',
-        label: 'ON STANDBY',
-        title: activeStandby.item || 'Standby Duty',
-        detail: `${activeStandby.signOn} - ${activeStandby.signOff}`,
-        icon: AlertCircle,
-        color: 'bg-amber-500 text-white',
-      };
-    }
-
-    // 4. Default to Off Duty
-    return {
-      type: 'OFF',
-      label: 'OFF DUTY',
-      title: 'At Home Base',
-      detail: 'Enjoying some rest',
-      icon: Clock,
-      color: 'bg-success text-white',
-    };
+  const upcomingTrips = useMemo(() => {
+    if (!data) return [];
+    return groupUpcomingTrips(data.roster.events, now);
   }, [data, now]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1 p-6 text-center">
-        <Loader2 size={32} className="animate-spin text-accent mb-4" />
-        <p className="text-[14px] font-black text-text uppercase tracking-widest">Loading Roster...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1">
+        <Loader2 size={32} className="animate-spin text-accent mb-3" />
+        <p className="text-[13px] font-black text-text-muted uppercase tracking-widest">Loading...</p>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (error || !data || !heroStatus) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-surface-1 p-8 text-center">
         <div className="w-20 h-20 rounded-[2rem] bg-danger/10 flex items-center justify-center mb-6">
           <AlertCircle size={40} className="text-danger" />
         </div>
-        <h1 className="text-2xl font-black text-text mb-2">Oops! Link invalid</h1>
-        <p className="text-[14px] text-text-muted font-bold leading-relaxed max-w-xs mb-8">
-          This share link may have expired or been reset by the pilot.
+        <h1 className="text-2xl font-black text-text mb-2">Link not found</h1>
+        <p className="text-[14px] text-text-muted font-bold leading-relaxed max-w-xs">
+          This link may have expired or been reset. Ask the pilot to share a new one.
         </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-8 py-4 rounded-full bg-accent text-accent-fg text-[14px] font-black shadow-lg shadow-accent/20"
-        >
-          Try again
-        </button>
       </div>
     );
   }
 
+  const { pilot, roster } = data;
+  const selectedEvents = selectedDate ? (eventsByDate.get(selectedDate) ?? []) : [];
+
   return (
-    <div className="min-h-screen bg-surface-1 pb-20">
-      {/* ── Header Status Banner ── */}
-      {currentStatus && (
-        <div className={`${currentStatus.color} px-6 pt-16 pb-8 rounded-b-[3rem] shadow-xl relative overflow-hidden`}>
-          {/* Decorative background icon */}
-          <currentStatus.icon size={120} className="absolute -right-8 -bottom-8 opacity-10 rotate-12" />
+    <div className="min-h-screen bg-surface-1 pb-24">
 
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-black tracking-widest uppercase mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              {currentStatus.label}
+      {/* ── Hero ── */}
+      <div className={`bg-gradient-to-br ${heroStatus.bg} px-6 pt-14 pb-10 rounded-b-[3rem] shadow-xl relative overflow-hidden`}>
+        <heroStatus.icon size={140} className="absolute -right-10 -bottom-6 opacity-[0.08]" strokeWidth={1} />
+        <div className="relative z-10">
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60 mb-3">
+            {pilot.full_name} · {pilot.rank}
+          </p>
+          <h1 className="text-4xl font-black tracking-tighter text-white leading-none mb-1">
+            {heroStatus.label}
+          </h1>
+          <p className="text-[18px] font-black text-white/90 mb-4">
+            {heroStatus.subtitle}
+          </p>
+          {heroStatus.tag ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
+              <span className="text-[11px] font-black text-white tracking-wide">{heroStatus.tag}</span>
             </div>
-            <h2 className="text-3xl font-black tracking-tighter leading-none mb-1">
-              {currentStatus.title}
-            </h2>
-            <p className="text-[15px] font-bold opacity-90">
-              {currentStatus.detail}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="px-6 -mt-6">
-        {/* ── Pilot Info ── */}
-        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-border flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-accent/5 flex items-center justify-center">
-            <User2 className="text-accent" size={24} />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-text-subtle leading-none mb-1">
-              Active Roster for
-            </p>
-            <h1 className="text-lg font-black text-text leading-tight">
-              {data.pilot.full_name}
-            </h1>
-            <p className="text-[12px] font-bold text-text-muted">
-              {data.pilot.rank} · {data.pilot.airline}
-            </p>
-          </div>
-        </div>
-
-        {/* ── Roster Timeline ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle">
-              Upcoming Schedule
-            </h3>
-            <div className="text-[11px] font-black text-accent uppercase tracking-widest flex items-center gap-1">
-              <Calendar size={12} />
-              {data.roster.month} {data.roster.year}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {data.roster.events.map((event, idx) => {
-              const eventDate = DateTime.fromISO(event.date);
-              const isPast = eventDate < now.startOf('day');
-              const isToday = eventDate.hasSame(now, 'day');
-
-              return (
-                <div
-                  key={event.id || idx}
-                  className={`bg-white rounded-[1.5rem] p-5 border transition-all ${
-                    isToday ? 'border-accent shadow-md ring-4 ring-accent/5' : 'border-border'
-                  } ${isPast ? 'opacity-50 grayscale-[0.5]' : ''}`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex gap-4">
-                      {/* Date Bubble */}
-                      <div className={`shrink-0 w-12 h-12 rounded-2xl flex flex-col items-center justify-center ${
-                        isToday ? 'bg-accent text-accent-fg' : 'bg-surface-2 text-text-muted'
-                      }`}>
-                        <span className="text-[10px] font-black uppercase leading-none mb-0.5">
-                          {eventDate.toFormat('ccc')}
-                        </span>
-                        <span className="text-lg font-black leading-none">
-                          {eventDate.toFormat('d')}
-                        </span>
-                      </div>
-
-                      {/* Content */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-md tracking-widest uppercase ${
-                            event.type === 'FLIGHT' ? 'bg-accent/10 text-accent' :
-                            event.type === 'LAYOVER' ? 'bg-indigo-100 text-indigo-700' :
-                            event.type === 'STANDBY' ? 'bg-amber-100 text-amber-700' :
-                            'bg-surface-2 text-text-subtle'
-                          }`}>
-                            {event.type}
-                          </span>
-                          {event.item && (
-                            <span className="text-[13px] font-black text-text">
-                              {event.item}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-[14px] font-bold text-text leading-snug">
-                          {event.type === 'FLIGHT' ? (
-                            <div className="flex items-center gap-1.5">
-                              {event.depPort} <ChevronRight size={12} className="text-text-subtle" /> {event.arrPort}
-                            </div>
-                          ) : event.type === 'LAYOVER' ? (
-                            event.hotel || event.arrPort || 'Layover'
-                          ) : event.type === 'STANDBY' ? (
-                            event.description || 'Standby Duty'
-                          ) : (
-                            event.description || event.type
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-3 mt-2 text-[11px] font-bold text-text-muted">
-                          {(event.std || event.signOn) && (
-                            <div className="flex items-center gap-1">
-                              <Clock size={12} />
-                              {event.std || event.signOn}
-                            </div>
-                          )}
-                          {(event.sta || event.signOff) && (
-                            <div className="flex items-center gap-1">
-                              <ChevronRight size={10} className="text-text-subtle" />
-                              {event.sta || event.signOff}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right side tag */}
-                    <div className="flex flex-col items-end gap-1.5">
-                      {isToday && (
-                        <span className="flex h-2 w-2 rounded-full bg-accent animate-pulse" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          ) : null}
         </div>
       </div>
 
-      {/* ── Footer Info ── */}
-      <div className="mt-12 px-8 text-center">
-        <p className="text-[11px] font-black text-text-subtle uppercase tracking-[0.2em] mb-2">
-          Shared via SkySchedule
-        </p>
-        <p className="text-[10px] text-text-subtle font-bold leading-relaxed max-w-[200px] mx-auto">
-          Raw data exactly as parsed from the roster. Times are shown in local time.
-        </p>
+      <div className="px-5 mt-6 space-y-6">
+
+        {/* ── Calendar ── */}
+        <div className="bg-white rounded-[2rem] p-5 border border-border shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle">
+              {roster.month} {roster.year}
+            </h2>
+            <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-text-subtle">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-sky-200 inline-block" />Flying</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-200 inline-block" />Away</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-200 inline-block" />Standby</span>
+            </div>
+          </div>
+
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-2">
+            {DAY_HEADERS.map(d => (
+              <div key={d} className="text-center text-[9px] font-black uppercase tracking-widest text-text-subtle py-1">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((day, idx) => {
+              if (!day) return <div key={`empty-${idx}`} />;
+              const isSelected = selectedDate === day.date;
+              const opacity = !day.isFuture && !day.isToday ? 'opacity-40' : '';
+              return (
+                <button
+                  key={day.date}
+                  onClick={() => setSelectedDate(isSelected ? null : day.date)}
+                  className={`
+                    aspect-square rounded-xl flex flex-col items-center justify-center
+                    text-[12px] font-black transition-all
+                    ${dayStatusColor(day.status, day.isToday)}
+                    ${opacity}
+                    ${isSelected ? 'scale-110 shadow-md' : ''}
+                  `}
+                >
+                  {day.dayNum}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Day detail panel */}
+          {selectedDate && (
+            <div className="mt-4 pt-4 border-t border-border animate-in slide-in-from-top-2 duration-150">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-black uppercase tracking-widest text-text-subtle">
+                  {DateTime.fromISO(selectedDate).toFormat('EEEE, d MMMM')}
+                </p>
+                <button onClick={() => setSelectedDate(null)} className="text-text-subtle hover:text-text transition-colors">
+                  <ChevronUp size={16} />
+                </button>
+              </div>
+              {getDayDescription(selectedEvents).split('\n').map((line, i) => (
+                <p key={i} className="text-[14px] font-bold text-text leading-relaxed">{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Upcoming Trips ── */}
+        {upcomingTrips.length > 0 && (
+          <div>
+            <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-text-subtle mb-3 px-1">
+              Upcoming Trips
+            </h2>
+            <div className="space-y-3">
+              {upcomingTrips.map((trip, i) => {
+                const sameMonth = trip.startDate.hasSame(trip.endDate, 'month');
+                const dateRange = sameMonth
+                  ? `${trip.startDate.toFormat('d')}–${trip.endDate.toFormat('d MMM')}`
+                  : `${trip.startDate.toFormat('d MMM')} – ${trip.endDate.toFormat('d MMM')}`;
+                const nights = Math.ceil(trip.endDate.diff(trip.startDate, 'days').days);
+
+                return (
+                  <div key={i} className="bg-white rounded-[1.75rem] p-5 border border-border shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-accent/8 flex items-center justify-center shrink-0">
+                      <Plane size={20} className="text-accent" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black text-text leading-tight">
+                        {trip.cities.length > 0 ? trip.cities.join(', ') : 'Away'}
+                      </p>
+                      <p className="text-[12px] font-bold text-text-muted mt-0.5">
+                        {dateRange}
+                        {nights > 0 ? ` · ${nights} night${nights !== 1 ? 's' : ''}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Legend ── */}
+        <div className="text-center pt-2">
+          <p className="text-[11px] font-black text-text-subtle uppercase tracking-[0.2em]">
+            Shared via Otarosta
+          </p>
+          <p className="text-[10px] text-text-subtle/60 font-bold mt-1">
+            Live read-only view · Updates automatically
+          </p>
+        </div>
+
       </div>
     </div>
   );
