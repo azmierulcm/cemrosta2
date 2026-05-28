@@ -12,7 +12,7 @@ import type { Listing } from '@/lib/types/marketplace';
 import {
   User2, Plane, Building2, MapPin, FileText,
   Loader2, Check, ChevronDown, ArrowRight, Camera, Trash2,
-  Lock, ShoppingBag, ExternalLink,
+  Lock, ShoppingBag, ExternalLink, Share2, Copy, RefreshCw, MessageCircle, AlertTriangle,
 } from 'lucide-react';
 import { FlipWords } from '@/components/shared/FlipWords';
 
@@ -104,6 +104,12 @@ export default function SettingsClient() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
 
+  // Spouse Share state
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   // Pre-fill from existing profile
   useEffect(() => {
     if (profile) {
@@ -117,8 +123,10 @@ export default function SettingsClient() {
         bio:       profile.bio       ?? '',
       });
       setAvatarUrl(profile.avatar_url ?? null);
+      setShareToken(profile.spouse_share_token ?? null);
     }
   }, [profile]);
+
 
   // Load user's listings
   useEffect(() => {
@@ -199,6 +207,42 @@ export default function SettingsClient() {
     } finally {
       setPwResetLoading(false);
     }
+  };
+
+  const handleResetToken = async () => {
+    if (!user) return;
+    setIsResetting(true);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/user/share-token/reset', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Reset failed');
+      setShareToken(json.token);
+      setProfile({ ...(profile ?? { id: user.uid }), spouse_share_token: json.token });
+      setShowResetConfirm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reset link.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const shareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/roster/view?token=${shareToken}`
+    : '';
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleWhatsAppShare = () => {
+    const text = `Hey, here is my active flight roster: ${shareUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -514,6 +558,75 @@ export default function SettingsClient() {
         </div>
       )}
 
+      {/* ── Spouse Share ── */}
+      {!isOnboarding && (
+        <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-4">
+          <div className="text-[10px] font-black uppercase tracking-[0.35em] text-text-subtle font-mono">
+            Family Sharing
+          </div>
+          <div>
+            <p className="text-[13px] font-black text-text flex items-center gap-2">
+              <Share2 size={14} className="text-accent" />
+              Spouse & Family View
+            </p>
+            <p className="text-[12px] text-text-muted font-bold mt-1 leading-snug">
+              Share a live, read-only view of your roster with your spouse or family.
+              They can see where you are and when you&apos;re coming home.
+            </p>
+          </div>
+
+          {shareToken ? (
+            <div className="space-y-4 pt-2">
+              <div className="relative">
+                <input
+                  readOnly
+                  value={shareUrl}
+                  className={`${inputCls} pr-12 font-mono text-[11px] bg-surface-1`}
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-accent hover:text-accent-hover transition-colors"
+                >
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleWhatsAppShare}
+                  className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#25D366] text-white text-[13px] font-black hover:opacity-90 transition-opacity"
+                >
+                  <MessageCircle size={16} />
+                  WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="flex items-center justify-center gap-2 py-3 rounded-2xl border border-danger/20 text-danger text-[13px] font-black hover:bg-danger/5 transition-colors"
+                >
+                  <RefreshCw size={14} />
+                  Reset link
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleResetToken}
+                disabled={isResetting}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-surface-2 border border-border text-[13px] font-black text-text hover:bg-white transition-all disabled:opacity-60"
+              >
+                {isResetting ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+                Generate Share Link
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── My listings ── */}
       {!isOnboarding && (
         <div className="mt-6 bg-white border border-border rounded-[2rem] p-8 shadow-sm space-y-4">
@@ -571,6 +684,40 @@ export default function SettingsClient() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Reset confirmation modal ── */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-3xl bg-danger/10 flex items-center justify-center mb-6">
+              <AlertTriangle size={32} className="text-danger" />
+            </div>
+            <h3 className="text-2xl font-black tracking-tight text-text leading-tight mb-2">
+              Reset share link?
+            </h3>
+            <p className="text-[14px] text-text-muted font-bold leading-relaxed mb-8">
+              The current link will stop working immediately. You&apos;ll need to send the new link to your family.
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={handleResetToken}
+                disabled={isResetting}
+                className="w-full py-4 rounded-full bg-danger text-white text-[15px] font-black hover:bg-danger-hover transition-all disabled:opacity-50"
+              >
+                {isResetting ? <Loader2 size={18} className="animate-spin mx-auto" /> : 'Yes, reset it'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="w-full py-4 rounded-full text-[15px] font-black text-text-muted hover:text-text transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
