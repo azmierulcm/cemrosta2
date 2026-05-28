@@ -5,14 +5,15 @@ import { useSearchParams } from 'next/navigation';
 import { DateTime } from 'luxon';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plane, Check, ChevronRight, ChevronLeft,
-  Clock3, MapPin, CalendarDays, BadgeCheck,
-  Moon, Sun, AlertCircle, Loader2,
+  Plane, PlaneTakeoff, PlaneLanding, Clock, MapPin,
+  ChevronLeft, ChevronRight, Check, Moon, Bed,
+  ShieldAlert, GraduationCap, CalendarDays, X,
+  ArrowRight, Gauge, Layers, Sparkles, Loader2, AlertCircle,
 } from 'lucide-react';
 import { getAirportMeta } from '@/lib/utils/destinations';
 import type { DutyEvent } from '@/lib/types';
 
-// ─── API types ────────────────────────────────────────────────────────────────
+// ─── API types (unchanged from share route) ───────────────────────────────────
 
 interface SharedRoster {
   month: string;
@@ -30,82 +31,110 @@ interface PilotInfo {
   base: string;
 }
 
-// ─── Internal card types ──────────────────────────────────────────────────────
+// ─── Internal types ───────────────────────────────────────────────────────────
 
-type DayType = 'flight' | 'standby' | 'off' | 'training' | 'rest';
+type DutyType = 'flight' | 'standby' | 'off' | 'training' | 'layover' | 'rest';
 
 interface Sector {
-  id: string;
-  flightNo: string;
+  no: string;
+  from: string;
+  to: string;
   dep: string;
   arr: string;
-  depTime: string;
-  arrTime: string;
-  aircraft: string;
-  workType: string;
+  ac: string;
 }
 
-interface RosterDay {
-  date: number;
-  dateStr: string;
-  type: DayType;
-  label: string;
-  base: string;
+interface DayDuty {
+  type: DutyType;
+  note?: string;
+  at?: string;          // layover destination IATA
+  sectors?: Sector[];
   dutyStart?: string;
   dutyEnd?: string;
-  crewStatus?: string;
-  continuesNextDay: boolean;
-  sectors: Sector[];
 }
 
-// ─── Colour system (vivid, not the pale bg-*-50 from the original design) ─────
-
-// Un-selected duty cell — vivid but not blinding
-const CELL_IDLE: Record<DayType, string> = {
-  flight:   'bg-sky-300   text-sky-900   ring-1 ring-sky-400   hover:bg-sky-400',
-  standby:  'bg-amber-300 text-amber-900 ring-1 ring-amber-400 hover:bg-amber-400',
-  off:      'bg-emerald-300 text-emerald-900 ring-1 ring-emerald-400 hover:bg-emerald-400',
-  training: 'bg-fuchsia-300 text-fuchsia-900 ring-1 ring-fuchsia-400 hover:bg-fuchsia-400',
-  rest:     'bg-zinc-200   text-zinc-500   ring-1 ring-zinc-300   hover:bg-zinc-300',
-};
-
-// Active / selected cell — solid saturated colour
-const CELL_ACTIVE: Record<DayType, string> = {
-  flight:   'bg-sky-600   text-white ring-2 ring-sky-700   shadow-lg shadow-sky-300/50',
-  standby:  'bg-amber-500 text-white ring-2 ring-amber-600 shadow-lg shadow-amber-300/50',
-  off:      'bg-emerald-600 text-white ring-2 ring-emerald-700 shadow-lg shadow-emerald-300/50',
-  training: 'bg-fuchsia-600 text-white ring-2 ring-fuchsia-700 shadow-lg shadow-fuchsia-300/50',
-  rest:     'bg-zinc-400   text-white ring-2 ring-zinc-500',
-};
-
-// Dot inside the compact cell
-const DOT: Record<DayType, string> = {
-  flight:   'bg-sky-600',
-  standby:  'bg-amber-600',
-  off:      'bg-emerald-700',
-  training: 'bg-fuchsia-700',
-  rest:     'bg-zinc-400',
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function cn(...parts: (string | boolean | undefined | null)[]) {
-  return parts.filter(Boolean).join(' ');
+interface Trip {
+  destCode: string;
+  destCity: string;
+  destFlag: string;
+  range: string;
+  nights: number;
+  sectors: number;
+  sched: string;
+  type: 'Long-haul' | 'Turnaround';
+  firstFlightDay: number; // day-of-month for modal link
 }
 
-function cityName(iata?: string | null) {
+interface UpNext {
+  fromCode: string;
+  fromCity: string;
+  toCode: string;
+  toCity: string;
+  flightNo: string;
+  report: string;
+  std: string;
+  arr: string;
+  ac: string;
+  overnight: boolean;
+  daysAway: number; // 0 = today, 1 = tomorrow, etc.
+  layoverNights: number;
+}
+
+// ─── Country flag helper (common MH destinations) ─────────────────────────────
+
+const FLAG: Record<string, string> = {
+  MY: '🇲🇾', GB: '🇬🇧', JP: '🇯🇵', ID: '🇮🇩', HK: '🇭🇰', AU: '🇦🇺',
+  SG: '🇸🇬', AE: '🇦🇪', CN: '🇨🇳', TH: '🇹🇭', VN: '🇻🇳', IN: '🇮🇳',
+  DE: '🇩🇪', FR: '🇫🇷', NL: '🇳🇱', TR: '🇹🇷', SA: '🇸🇦', QA: '🇶🇦',
+  KR: '🇰🇷', PH: '🇵🇭', BD: '🇧🇩', PK: '🇵🇰', NZ: '🇳🇿', ZA: '🇿🇦',
+  LK: '🇱🇰', MV: '🇲🇻', OM: '🇴🇲', KW: '🇰🇼', BH: '🇧🇭', MM: '🇲🇲',
+  KH: '🇰🇭', LA: '🇱🇦', TW: '🇹🇼', US: '🇺🇸', CA: '🇨🇦',
+};
+
+const COUNTRY_CODE: Record<string, string> = {
+  Malaysia: 'MY', 'United Kingdom': 'GB', Japan: 'JP', Indonesia: 'ID',
+  'Hong Kong': 'HK', Australia: 'AU', Singapore: 'SG', 'United Arab Emirates': 'AE',
+  China: 'CN', Thailand: 'TH', Vietnam: 'VN', India: 'IN', Germany: 'DE',
+  France: 'FR', Netherlands: 'NL', Turkey: 'TR', 'Saudi Arabia': 'SA', Qatar: 'QA',
+  'South Korea': 'KR', Philippines: 'PH', Bangladesh: 'BD', Pakistan: 'PK',
+  'New Zealand': 'NZ', 'South Africa': 'ZA', 'Sri Lanka': 'LK', Maldives: 'MV',
+  Oman: 'OM', Kuwait: 'KW', Bahrain: 'BH', Myanmar: 'MM', Cambodia: 'KH',
+  Laos: 'LA', Taiwan: 'TW', 'United States': 'US', Canada: 'CA',
+};
+
+function airportFlag(iata: string): string {
+  const meta = getAirportMeta(iata);
+  const cc   = COUNTRY_CODE[meta.country ?? ''] ?? '';
+  return FLAG[cc] ?? '✈️';
+}
+
+function cityName(iata?: string | null): string {
   if (!iata) return iata ?? '';
   return getAirportMeta(iata).city || iata;
 }
 
-function isOvernight(f: DutyEvent) {
-  return !!(f.std && f.sta && f.sta < f.std);
+// ─── Data helpers ─────────────────────────────────────────────────────────────
+
+/** Sum blockHrs strings across FLIGHT events → "HH:MM" or "—" */
+function sumBlockHours(events: DutyEvent[]): string {
+  let mins = 0;
+  let found = false;
+  for (const e of events) {
+    if (e.type === 'FLIGHT' && e.blockHrs) {
+      const [h, m] = e.blockHrs.split(':').map(Number);
+      mins += (h * 60) + (m || 0);
+      found = true;
+    }
+  }
+  if (!found) return '—';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
 }
 
-// ─── Build one RosterDay from the DutyEvent[] for a date ─────────────────────
-
-function buildDay(dateStr: string, events: DutyEvent[], base: string): RosterDay {
-  const dt = DateTime.fromISO(dateStr);
+/** Build a DayDuty record from all DutyEvents on a single day */
+function buildDayDuty(events: DutyEvent[]): DayDuty | null {
+  if (!events.length) return null;
 
   const flights  = events.filter(e => e.type === 'FLIGHT');
   const standby  = events.find(e => e.type === 'STANDBY');
@@ -113,109 +142,70 @@ function buildDay(dateStr: string, events: DutyEvent[], base: string): RosterDay
   const off      = events.find(e => e.type === 'OFF');
   const training = events.find(e => e.type === 'TRAINING' || e.type === 'GROUND');
 
-  // Flight day
   if (flights.length > 0) {
-    const first    = flights[0];
-    const last     = flights[flights.length - 1];
-    const overnight = isOvernight(last);
-    const continues = overnight || !!layover;
-
-    const sectors: Sector[] = flights.map((f, i) => ({
-      id:       f.id || `${dateStr}-${i}`,
-      flightNo: f.item || f.flightNumber || '—',
-      dep:      f.depPort || '—',
-      arr:      f.arrPort || '—',
-      depTime:  f.std || f.signOn || '—',
-      arrTime:  `${f.sta || f.signOff || '—'}${isOvernight(f) ? '+' : ''}`,
-      aircraft: f.acType || '—',
-      workType: f.dutyCode || 'OP',
+    const first = flights[0];
+    const last  = flights[flights.length - 1];
+    const overnight = last.sta && last.std ? last.sta < last.std : false;
+    const sectors: Sector[] = flights.map(f => ({
+      no:   f.item || f.flightNumber || '—',
+      from: f.depPort || '—',
+      to:   f.arrPort || '—',
+      dep:  f.std     || f.signOn   || '—',
+      arr:  `${f.sta || f.signOff || '—'}${(f.sta && f.std && f.sta < f.std) ? '⁺¹' : ''}`,
+      ac:   f.acType  || '—',
     }));
-
     return {
-      date: dt.day, dateStr,
       type: 'flight',
-      label: `${flights.length}x`,
-      base,
-      dutyStart: first.std || first.signOn,
-      dutyEnd:   `${last.sta || last.signOff || ''}${overnight ? '+' : ''}`,
-      crewStatus: first.dutyCode === 'DH' ? 'Deadheading' : 'Operating',
-      continuesNextDay: continues,
+      note: first.signOn ? `Report ${first.signOn}` : undefined,
       sectors,
+      dutyStart: first.std || first.signOn,
+      dutyEnd:   `${last.sta || last.signOff || ''}${overnight ? '⁺¹' : ''}`,
     };
   }
 
-  // Standby (includes LAYOVER-only)
-  if (standby || layover) {
-    const ev = standby || layover!;
-    const sector: Sector | null = ev.depPort && ev.arrPort ? {
-      id:       `${dateStr}-sby`,
-      flightNo: ev.item || '—',
-      dep:      ev.depPort,
-      arr:      ev.arrPort,
-      depTime:  ev.signOn || '—',
-      arrTime:  ev.signOff || '—',
-      aircraft: '—',
-      workType: 'SBY',
-    } : null;
+  if (layover && !standby) {
+    // Layover day (no outbound flight today — crew is away from base)
+    const prev = layover.depPort || layover.arrPort;
+    return { type: 'layover', at: prev || '?' };
+  }
 
+  if (standby) {
     return {
-      date: dt.day, dateStr,
       type: 'standby',
-      label: ev.item || 'SBY',
-      base,
-      dutyStart: ev.signOn,
-      dutyEnd:   ev.signOff,
-      crewStatus: standby ? (ev.item?.startsWith('S4') ? 'Airport standby' : 'Home standby') : 'On layover',
-      continuesNextDay: false,
-      sectors: sector ? [sector] : [],
+      note: standby.description || standby.item || 'Standby',
+      dutyStart: standby.signOn,
+      dutyEnd:   standby.signOff,
     };
   }
 
-  // Training / ground
   if (training) {
     return {
-      date: dt.day, dateStr,
       type: 'training',
-      label: training.item || 'TRN',
-      base,
+      note: training.description || training.item || 'Ground duty',
       dutyStart: training.signOn,
       dutyEnd:   training.signOff,
-      crewStatus: training.description || 'Ground duty',
-      continuesNextDay: false,
-      sectors: [],
     };
   }
 
-  // Off
   if (off) {
     return {
-      date: dt.day, dateStr,
       type: 'off',
-      label: off.item || 'D',
-      base,
-      crewStatus: off.item === 'DO' ? 'Day off' : 'Off at base',
-      continuesNextDay: false,
-      sectors: [],
+      note: off.item === 'DO' ? 'Day off' : (off.description || 'Off'),
     };
   }
 
-  // Rest / blank
-  return {
-    date: dt.day, dateStr,
-    type: 'rest',
-    label: '—',
-    base,
-    crewStatus: 'Rest day',
-    continuesNextDay: false,
-    sectors: [],
-  };
+  return null;
 }
 
-// Build all 28–31 days for the month
-function buildRosterDays(roster: SharedRoster, base: string): RosterDay[] {
+/** Group consecutive flight+layover days into trip pairings */
+function buildTrips(
+  roster: SharedRoster,
+  base: string,
+): Trip[] {
   const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
   if (!start.isValid) return [];
 
+  // Build a sorted list of [dateStr, events[]] pairs
   const eventMap = new Map<string, DutyEvent[]>();
   for (const e of roster.events ?? []) {
     const list = eventMap.get(e.date) ?? [];
@@ -223,220 +213,420 @@ function buildRosterDays(roster: SharedRoster, base: string): RosterDay[] {
     eventMap.set(e.date, list);
   }
 
-  const days: RosterDay[] = [];
+  const allDays: Array<{ dateStr: string; day: number; duty: DayDuty | null }> = [];
   for (let d = 1; d <= (start.daysInMonth ?? 30); d++) {
-    const dt      = start.set({ day: d });
-    const dateStr = dt.toFormat('yyyy-MM-dd');
-    days.push(buildDay(dateStr, eventMap.get(dateStr) ?? [], base));
+    const dateStr = start.set({ day: d }).toFormat('yyyy-MM-dd');
+    allDays.push({ dateStr, day: d, duty: buildDayDuty(eventMap.get(dateStr) ?? []) });
   }
-  return days;
+
+  const trips: Trip[] = [];
+  let i = 0;
+
+  while (i < allDays.length) {
+    const { duty, day, dateStr } = allDays[i];
+    if (!duty || duty.type !== 'flight' || !duty.sectors?.length) { i++; continue; }
+
+    const firstSector = duty.sectors[0];
+    // Only start a trip when departing from base (or first flight of any chain)
+    // We'll collect all consecutive flight/layover days regardless
+    const tripDays: typeof allDays[number][] = [allDays[i]];
+    let j = i + 1;
+
+    while (j < allDays.length) {
+      const next = allDays[j];
+      if (!next.duty || (next.duty.type !== 'flight' && next.duty.type !== 'layover')) break;
+      tripDays.push(next);
+      j++;
+    }
+
+    // Derive destination: first non-base arrival IATA
+    let destCode = '';
+    const allSectors = tripDays.flatMap(d => d.duty?.sectors ?? []);
+    for (const s of allSectors) {
+      if (s.to && s.to !== base && s.to !== '—') { destCode = s.to; break; }
+    }
+    if (!destCode && firstSector.to !== '—') destCode = firstSector.to;
+    if (!destCode) { i = j; continue; }
+
+    const nights = tripDays.filter(d => d.duty?.type === 'layover').length;
+    const flightDays = tripDays.filter(d => d.duty?.type === 'flight');
+    const sectors = allSectors.length;
+    const flightNos = allSectors.map(s => s.no).filter(Boolean).join(' / ');
+
+    // Date range label
+    const firstDate = DateTime.fromISO(dateStr);
+    const lastDay   = tripDays[tripDays.length - 1];
+    const lastDate  = DateTime.fromISO(lastDay.dateStr);
+    const rangeLabel = firstDate.day === lastDate.day
+      ? firstDate.toFormat('MMM d')
+      : `${firstDate.toFormat('MMM d')} – ${lastDate.toFormat('d')}`;
+
+    trips.push({
+      destCode,
+      destCity: cityName(destCode),
+      destFlag: airportFlag(destCode),
+      range: rangeLabel,
+      nights,
+      sectors,
+      sched: flightNos,
+      type: nights > 0 ? 'Long-haul' : 'Turnaround',
+      firstFlightDay: day,
+    });
+
+    i = j;
+  }
+
+  return trips;
 }
 
-// Build calendar cells (null = empty pad)
-function buildCalendarCells(roster: SharedRoster): (number | null)[] {
+/** Find the next upcoming flight from today */
+function findUpNext(rosters: SharedRoster[], now: DateTime, base: string): UpNext | null {
+  const todayStr = now.toFormat('yyyy-MM-dd');
+  const allEvents = rosters.flatMap(r => r.events ?? []);
+
+  // Check if currently on layover
+  const todayLayover = allEvents.find(e => e.date === todayStr && e.type === 'LAYOVER');
+  if (todayLayover) {
+    // Find the return flight
+    const returnFlight = allEvents.find(e =>
+      e.date > todayStr && e.type === 'FLIGHT' && (e.depPort !== base || true),
+    );
+    if (returnFlight) {
+      const daysAway = Math.round(DateTime.fromISO(returnFlight.date).diff(now, 'days').days);
+      return {
+        fromCode: returnFlight.depPort || '—',
+        fromCity: cityName(returnFlight.depPort),
+        toCode:   returnFlight.arrPort || '—',
+        toCity:   cityName(returnFlight.arrPort),
+        flightNo: returnFlight.item || returnFlight.flightNumber || '—',
+        report:   returnFlight.signOn || '—',
+        std:      returnFlight.std || '—',
+        arr:      returnFlight.sta || '—',
+        ac:       returnFlight.acType || '—',
+        overnight: !!(returnFlight.sta && returnFlight.std && returnFlight.sta < returnFlight.std),
+        daysAway,
+        layoverNights: 0,
+      };
+    }
+  }
+
+  // Next upcoming flight from today or tomorrow
+  const upcoming = allEvents
+    .filter(e => e.type === 'FLIGHT' && e.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (!upcoming.length) return null;
+
+  const next = upcoming[0];
+  const daysAway = Math.round(DateTime.fromISO(next.date).diff(now, 'days').days);
+
+  // Count layover nights after this flight
+  const layoverNights = allEvents.filter(e =>
+    e.type === 'LAYOVER' && e.date > next.date,
+  ).length;
+
+  return {
+    fromCode: next.depPort || '—',
+    fromCity: cityName(next.depPort),
+    toCode:   next.arrPort || '—',
+    toCity:   cityName(next.arrPort),
+    flightNo: next.item || next.flightNumber || '—',
+    report:   next.signOn || '—',
+    std:      next.std || '—',
+    arr:      next.sta || '—',
+    ac:       next.acType || '—',
+    overnight: !!(next.sta && next.std && next.sta < next.std),
+    daysAway,
+    layoverNights,
+  };
+}
+
+/** Sort rosters chronologically (oldest first) */
+function sortRostersChronologically(rosters: SharedRoster[]): SharedRoster[] {
+  return [...rosters].sort((a, b) => {
+    const dtA = DateTime.fromFormat(`${a.month} ${a.year}`, 'MMMM yyyy');
+    const dtB = DateTime.fromFormat(`${b.month} ${b.year}`, 'MMMM yyyy');
+    return dtA.toMillis() - dtB.toMillis();
+  });
+}
+
+// ─── Calendar grid builder ────────────────────────────────────────────────────
+
+function buildCalendarMatrix(roster: SharedRoster): (number | null)[][] {
   const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
   if (!start.isValid) return [];
-  const offset = start.weekday === 7 ? 6 : start.weekday - 1; // Mon-first
-  const cells: (number | null)[] = Array(offset).fill(null);
-  for (let d = 1; d <= (start.daysInMonth ?? 30); d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+  const offset = start.weekday === 7 ? 6 : start.weekday - 1;
+  const flat: (number | null)[] = Array(offset).fill(null);
+  for (let d = 1; d <= (start.daysInMonth ?? 30); d++) flat.push(d);
+  while (flat.length % 7 !== 0) flat.push(null);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < flat.length; i += 7) weeks.push(flat.slice(i, i + 7));
+  return weeks;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const DOW = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-function InfoPill({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function NavBtn({
+  children, onClick, disabled,
+}: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
-    <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 backdrop-blur">
-      <div className="mb-1 flex items-center gap-1.5 text-white/45">
-        {icon}
-        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
-      </div>
-      <p className="truncate text-xs font-black text-white">{value}</p>
-    </div>
-  );
-}
-
-function AirportBlock({ code, time, align }: { code: string; time: string; align: 'left' | 'right' }) {
-  return (
-    <div className={align === 'right' ? 'text-right' : 'text-left'}>
-      <p className="text-2xl font-black tracking-tight text-slate-950 leading-none">{code}</p>
-      <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{cityName(code)}</p>
-      <p className="mt-1 text-[13px] font-black text-slate-600">{time}</p>
-    </div>
-  );
-}
-
-function Summary({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-3xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-slate-500 shadow-sm ring-1 ring-zinc-100">
-        {icon}
-      </div>
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">{label}</p>
-      <p className="mt-1 text-lg font-black text-zinc-800">{value}</p>
-    </div>
-  );
-}
-
-function RosterDetailCard({
-  day,
-  monthYear,
-  todayStr,
-}: {
-  day: RosterDay;
-  monthYear: string;
-  todayStr: string;
-}) {
-  const isToday    = day.dateStr === todayStr;
-  const sectorCount = day.sectors.length;
-
-  return (
-    <motion.aside
-      key={day.dateStr}
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 10, scale: 0.98 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04]"
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="grid h-[34px] w-[34px] place-items-center rounded-[10px] border border-white/10 bg-white/5 text-board-muted transition-colors hover:text-board-text disabled:cursor-not-allowed disabled:opacity-30"
     >
-      {/* Dark gradient header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-5 text-white">
-        <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-sky-400/20 blur-3xl" />
-        <div className="absolute -bottom-20 left-10 h-40 w-40 rounded-full bg-amber-300/10 blur-3xl" />
+      {children}
+    </button>
+  );
+}
 
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              'grid h-14 w-14 place-items-center rounded-2xl shadow-lg',
-              isToday ? 'bg-accent' : 'bg-white',
-            )}>
-              <span className={cn('text-2xl font-black tracking-tight', isToday ? 'text-white' : 'text-slate-950')}>
-                {day.date}
-              </span>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/45">{monthYear}</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">{day.label}</h2>
-              {isToday && (
-                <span className="mt-1 inline-block rounded-full bg-accent/30 px-2 py-0.5 text-[10px] font-black text-white">
-                  Today
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/80 ring-1 ring-white/10 shrink-0">
-            {sectorCount > 0 ? `${sectorCount} leg${sectorCount > 1 ? 's' : ''}` : 'No sector'}
-          </div>
-        </div>
+function MetaPill({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div>
+      <div className="font-jb text-[10px] tracking-[.14em] text-board-faint">{label}</div>
+      <div className={`mt-[3px] font-jb text-[18px] font-bold ${accent ? 'text-board-gold' : 'text-board-text'}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
 
-        <div className="relative mt-5 grid grid-cols-3 gap-2">
-          <InfoPill icon={<MapPin className="h-3.5 w-3.5" />} label="Base" value={day.base} />
-          <InfoPill
-            icon={<Clock3 className="h-3.5 w-3.5" />}
-            label="Duty"
-            value={day.dutyStart && day.dutyEnd ? `${day.dutyStart} – ${day.dutyEnd}` : '—'}
-          />
-          <InfoPill
-            icon={day.continuesNextDay ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-            label="Return"
-            value={day.continuesNextDay ? 'Next day' : 'Same day'}
-          />
-        </div>
+function StatCard({
+  icon: Icon, value, label, sub, color,
+}: { icon: React.ElementType; value: React.ReactNode; label: string; sub?: string; color?: string }) {
+  return (
+    <div className="rounded-[14px] border border-white/7 bg-white/[.03] px-3 pb-3 pt-3.5 transition-transform hover:-translate-y-0.5">
+      <Icon size={15} className={color ?? 'text-board-muted'} />
+      <div className={`mt-2.5 font-jb text-[22px] font-bold leading-none ${color ?? 'text-board-text'}`}>
+        {value}
+      </div>
+      <div className="mt-1.5 font-jb text-[10px] tracking-[.12em] text-board-muted">{label}</div>
+      {sub && <div className="mt-0.5 text-[11px] text-board-faint">{sub}</div>}
+    </div>
+  );
+}
+
+function DutyTag({
+  children, className,
+}: { children: React.ReactNode; className: string }) {
+  return (
+    <div className={`mt-auto inline-flex max-w-max items-center gap-1.5 rounded-lg px-2 py-[5px] font-jb text-[10px] font-semibold tracking-[.06em] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function DayCell({
+  day, duty, isToday, onClick,
+}: {
+  day: number | null;
+  duty: DayDuty | null;
+  isToday: boolean;
+  onClick: () => void;
+}) {
+  if (!day) return <div className="min-h-[80px] rounded-[12px] sm:min-h-[96px]" />;
+
+  const isFlight  = duty?.type === 'flight';
+  const hasAction = !!duty && duty.type !== 'rest';
+
+  return (
+    <div
+      onClick={hasAction ? onClick : undefined}
+      style={isToday ? { boxShadow: '0 0 0 1.5px #F5B544, 0 6px 24px rgba(245,181,68,.2)' } : undefined}
+      className={[
+        'flex min-h-[80px] flex-col rounded-[12px] border bg-white/[.02] p-[7px] transition-all sm:min-h-[96px] sm:p-[9px]',
+        isToday ? 'border-board-gold' : 'border-white/7',
+        hasAction
+          ? 'cursor-pointer hover:-translate-y-[2px] hover:border-white/20 hover:bg-white/[.04]'
+          : 'cursor-default',
+        isFlight ? 'hover:border-board-flight/40 hover:shadow-[0_8px_24px_rgba(56,189,248,.12)]' : '',
+      ].join(' ')}
+    >
+      {/* Day number */}
+      <div className="flex items-center justify-between">
+        <span className={`font-jb text-[12px] font-semibold sm:text-[13px] ${isToday ? 'text-board-gold' : 'text-board-muted'}`}>
+          {day}
+        </span>
+        {isToday && (
+          <span className="rounded-[4px] bg-board-gold px-[4px] py-0.5 font-jb text-[7px] font-bold tracking-[.1em] text-board-ink sm:text-[8.5px]">
+            TODAY
+          </span>
+        )}
       </div>
 
-      {/* Body */}
-      <div className="p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Crew status</p>
-            <p className="mt-1 text-lg font-black text-slate-900">{day.crewStatus ?? 'Operating'}</p>
-          </div>
-          <div className="rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">
-            <BadgeCheck className="mr-1 inline h-3.5 w-3.5" />Synced
-          </div>
+      {/* Flight rows */}
+      {isFlight && duty?.sectors && (
+        <div className="mt-auto flex flex-col gap-[3px]">
+          {duty.sectors.map((s, i) => (
+            <div key={i} className="flex flex-col gap-px border-l-2 border-board-flight pl-[6px]">
+              <div className="font-jb text-[10px] font-bold tracking-[.02em] text-board-flight sm:text-[11px]">
+                {s.no}
+              </div>
+              <div className="flex gap-[2px] font-jb text-[10px] text-board-text sm:text-[11px]">
+                {s.from}<span className="text-board-faint">→</span>{s.to}
+              </div>
+              <div className="hidden font-jb text-[9px] text-board-muted sm:block">
+                {s.dep.replace('⁺¹', '')}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Layover tag */}
+      {duty?.type === 'layover' && (
+        <DutyTag className="bg-board-flight/[.08] text-board-flight/70">
+          <Moon size={10} /> LAYOVER{duty.at ? ` ${duty.at}` : ''}
+        </DutyTag>
+      )}
+
+      {/* Standby tag */}
+      {duty?.type === 'standby' && (
+        <DutyTag className="bg-board-standby/[.08] text-board-standby">
+          <ShieldAlert size={10} /> SBY
+        </DutyTag>
+      )}
+
+      {/* Training tag */}
+      {duty?.type === 'training' && (
+        <DutyTag className="bg-board-training/10 text-board-training">
+          <GraduationCap size={10} /> TRN
+        </DutyTag>
+      )}
+
+      {/* Off tag */}
+      {duty?.type === 'off' && (
+        <DutyTag className="bg-board-dayoff/[.07] text-board-dayoff">
+          <Bed size={10} /> OFF
+        </DutyTag>
+      )}
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/[.06] px-1 pb-1 pt-4">
+      {([
+        ['bg-board-flight',   'Flight'],
+        ['bg-board-standby',  'Standby'],
+        ['bg-board-dayoff',   'Day off'],
+        ['bg-board-training', 'Training'],
+      ] as const).map(([bg, label]) => (
+        <span key={label} className="inline-flex items-center gap-[7px] font-jb text-[11px] text-board-muted">
+          <i className={`h-[8px] w-[8px] rounded-[2px] ${bg}`} /> {label}
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-[7px] font-jb text-[11px] text-board-muted">
+        <i className="h-[8px] w-[8px] rounded-[2px] bg-board-flight opacity-40" /> Layover
+      </span>
+    </div>
+  );
+}
+
+// ─── Day detail modal ─────────────────────────────────────────────────────────
+
+function DayModal({
+  dateLabel, duty, onClose,
+}: { dateLabel: string; duty: DayDuty; onClose: () => void }) {
+  const typeLabel: Record<DutyType, string> = {
+    flight: 'Flight Duty', standby: 'Standby', off: 'Day Off',
+    training: 'Training', layover: 'Layover', rest: 'Rest',
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 grid place-items-center bg-[rgba(4,7,14,.76)] p-5 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 10 }}
+        transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+        className="relative w-full max-w-[460px] overflow-hidden rounded-[20px] border border-white/10 bg-[#0c1120] p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-white/6 text-board-muted hover:text-board-text"
+        >
+          <X size={15} />
+        </button>
+
+        <div className="font-jb text-[11px] tracking-[.14em] text-board-gold">{dateLabel}</div>
+        <div className="mt-1 font-display text-2xl font-extrabold text-board-text">
+          {typeLabel[duty.type]}
         </div>
 
-        {sectorCount > 0 ? (
-          <div className="space-y-3">
-            {day.sectors.map((s, i) => (
-              <div key={s.id} className="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-[11px] font-black text-slate-500 shadow-sm ring-1 ring-slate-100">
-                      {i + 1}
-                    </span>
-                    <span className="text-[14px] font-black text-emerald-700">{s.flightNo}</span>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-400 ring-1 ring-slate-100">
-                      {s.workType}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-400">{s.aircraft !== '—' ? s.aircraft : ''}</span>
-                </div>
+        {duty.note && (
+          <div className="mt-2.5 inline-flex items-center gap-2 font-jb text-[12px] text-board-muted">
+            <Clock size={12} /> {duty.note}
+          </div>
+        )}
 
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <AirportBlock code={s.dep} time={s.depTime} align="left" />
-                  <div className="flex items-center gap-1 text-slate-300">
-                    <span className="h-px w-4 bg-slate-200" />
-                    <Plane className="h-4 w-4 text-sky-500" />
-                    <span className="h-px w-4 bg-slate-200" />
+        {/* Duty times for non-flight */}
+        {duty.type !== 'flight' && duty.dutyStart && (
+          <div className="mt-2 font-jb text-[12px] text-board-muted">
+            {duty.dutyStart} – {duty.dutyEnd || '?'}
+          </div>
+        )}
+
+        {/* Layover location */}
+        {duty.type === 'layover' && duty.at && (
+          <div className="mt-4 flex items-center gap-3 rounded-[12px] border border-board-flight/20 bg-board-flight/[.05] px-4 py-3">
+            <Moon size={18} className="text-board-flight/60" />
+            <div>
+              <div className="font-jb text-[11px] text-board-muted">LAYOVER DESTINATION</div>
+              <div className="mt-0.5 font-display text-xl font-extrabold text-board-text">{duty.at}</div>
+              <div className="font-jb text-[11px] text-board-muted">{cityName(duty.at)}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Sector cards for flights */}
+        {duty.type === 'flight' && duty.sectors && (
+          <div className="mt-5 flex flex-col gap-3">
+            {duty.sectors.map((s, i) => (
+              <div key={i} className="rounded-[14px] border border-board-flight/[.18] bg-board-flight/[.05] px-4 py-3.5">
+                <div className="font-jb text-[14px] font-bold text-board-flight">
+                  {s.no} <span className="ml-1.5 font-medium text-board-faint">{s.ac !== '—' ? s.ac : ''}</span>
+                </div>
+                <div className="mt-3 flex items-center">
+                  {/* DEP */}
+                  <div className="flex-1">
+                    <div className="font-display text-[26px] font-extrabold leading-none text-board-text">{s.from}</div>
+                    <div className="mt-1 flex items-center gap-1.5 font-jb text-[12px] text-board-text">
+                      <PlaneTakeoff size={11} className="text-board-flight" /> {s.dep}
+                    </div>
+                    <div className="mt-0.5 font-jb text-[11px] text-board-muted">{cityName(s.from)}</div>
                   </div>
-                  <AirportBlock code={s.arr} time={s.arrTime} align="right" />
+                  {/* arc */}
+                  <div className="flex flex-1 items-center justify-center gap-1.5 px-2">
+                    <span className="h-[1.5px] flex-1 rounded bg-[repeating-linear-gradient(90deg,rgba(56,189,248,.4)_0_5px,transparent_5px_10px)]" />
+                    <Plane size={13} className="rotate-45 text-board-flight" />
+                  </div>
+                  {/* ARR */}
+                  <div className="flex-1 text-right">
+                    <div className="font-display text-[26px] font-extrabold leading-none text-board-text">{s.to}</div>
+                    <div className="mt-1 flex items-center justify-end gap-1.5 font-jb text-[12px] text-board-text">
+                      <PlaneLanding size={11} className="text-board-flight" /> {s.arr}
+                    </div>
+                    <div className="mt-0.5 font-jb text-[11px] text-board-muted">{cityName(s.to)}</div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
-            <p className="text-[13px] font-bold text-slate-600">
-              {day.type === 'off'      ? `Day off at ${day.base}` :
-               day.type === 'training' ? `Ground / training duty at ${day.base}` :
-               day.type === 'standby'  ? `Standby at ${day.base}` :
-               'No duty scheduled'}
-            </p>
-            {day.dutyStart && (
-              <p className="mt-1 text-[11px] text-slate-400 font-bold">
-                {day.dutyStart} – {day.dutyEnd}
-              </p>
-            )}
-          </div>
         )}
-      </div>
-    </motion.aside>
+      </motion.div>
+    </motion.div>
   );
-}
-
-// ─── Hero / today status label ────────────────────────────────────────────────
-
-function getTodayLabel(rosters: SharedRoster[], now: DateTime, base: string): string {
-  const todayStr = now.toFormat('yyyy-MM-dd');
-  const nowTime  = now.toFormat('HH:mm');
-  const all      = rosters.flatMap(r => r.events ?? []);
-  const today    = all.filter(e => e.date === todayStr);
-
-  const flying = today.find(e =>
-    e.type === 'FLIGHT' && e.std && e.sta && nowTime >= e.std && nowTime <= e.sta,
-  );
-  if (flying) return `In the air · ${cityName(flying.depPort)} → ${cityName(flying.arrPort)}`;
-
-  if (today.find(e => e.type === 'LAYOVER')) return 'On layover';
-
-  const sby = today.find(e =>
-    e.type === 'STANDBY' && e.signOn && e.signOff && nowTime >= e.signOn! && nowTime <= e.signOff!,
-  );
-  if (sby) return `On standby until ${sby.signOff}`;
-
-  const next = Array.from(new Set(all.map(e => e.date)))
-    .sort()
-    .find(d => d > todayStr && ['FLIGHT', 'STANDBY', 'LAYOVER'].includes(
-      all.find(e => e.date === d)?.type ?? '',
-    ));
-  const daysTo = next ? Math.ceil(DateTime.fromISO(next).diff(now, 'days').days) : null;
-  return daysTo != null
-    ? daysTo <= 1 ? 'At home · Next trip tomorrow' : `At home · Next trip in ${daysTo} days`
-    : `At home · ${cityName(base) || base}`;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -445,94 +635,130 @@ export default function SpouseViewClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [apiData, setApiData]         = useState<{ pilot: PilotInfo; rosters: SharedRoster[] } | null>(null);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
-  const [now, setNow]                 = useState(() => DateTime.now());
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const [activeDate, setActiveDate]   = useState<number | null>(null);
+  const [apiData, setApiData]   = useState<{ pilot: PilotInfo; rosters: SharedRoster[] } | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [now, setNow]           = useState(() => DateTime.now());
+  const [rosterIdx, setRosterIdx] = useState(0);
+  const [view, setView]         = useState<'grid' | 'trips'>('grid');
+  const [openDay, setOpenDay]   = useState<{ dateLabel: string; duty: DayDuty } | null>(null);
 
+  // Keep "now" ticking
   useEffect(() => {
     const t = setInterval(() => setNow(DateTime.now()), 60_000);
     return () => clearInterval(t);
   }, []);
 
+  // Fetch share data
   useEffect(() => {
     if (!token) { setLoading(false); setError('no-token'); return; }
     fetch(`/api/roster/share?token=${encodeURIComponent(token)}`)
       .then(async res => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Failed to load');
-        // Auto-select today's month if available
-        const rosters: SharedRoster[] = json.rosters ?? [];
-        const todayMonth = now.toFormat('MMMM');
-        const todayYear  = now.toFormat('yyyy');
-        const todayIdx   = rosters.findIndex(r => r.month === todayMonth && r.year === todayYear);
-        if (todayIdx >= 0) setSelectedIdx(todayIdx);
-        setApiData(json);
+        const rosters = sortRostersChronologically(json.rosters ?? []);
+        // Default to current month if available
+        const todayFmt = now.toFormat('MMMM yyyy');
+        const idx = rosters.findIndex(r => `${r.month} ${r.year}` === todayFmt);
+        if (idx >= 0) setRosterIdx(idx);
+        setApiData({ ...json, rosters });
       })
       .catch(err => setError(String(err?.message ?? err)))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const roster   = apiData?.rosters[selectedIdx];
+  const rosters = apiData?.rosters ?? [];
+  const roster  = rosters[rosterIdx];
+  const pilot   = apiData?.pilot;
   const todayStr = now.toFormat('yyyy-MM-dd');
 
-  const rosterDays = useMemo(
-    () => roster ? buildRosterDays(roster, apiData?.pilot.base ?? 'KUL') : [],
-    [roster, apiData?.pilot.base],
+  // Event map for current month
+  const eventMap = useMemo(() => {
+    const m = new Map<string, DutyEvent[]>();
+    for (const e of roster?.events ?? []) {
+      const list = m.get(e.date) ?? [];
+      list.push(e);
+      m.set(e.date, list);
+    }
+    return m;
+  }, [roster]);
+
+  // Calendar matrix
+  const weeks = useMemo(() => roster ? buildCalendarMatrix(roster) : [], [roster]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const events = roster?.events ?? [];
+    let fd = 0, sb = 0, sec = 0, off = 0;
+    const destSet = new Set<string>();
+    for (const e of events) {
+      if (e.type === 'FLIGHT') {
+        fd++;
+        sec++;
+        if (e.arrPort && e.arrPort !== pilot?.base) destSet.add(e.arrPort);
+      } else if (e.type === 'STANDBY') sb++;
+      else if (e.type === 'OFF') off++;
+    }
+    // Flight days = unique dates with FLIGHT events
+    const flightDates = new Set(events.filter(e => e.type === 'FLIGHT').map(e => e.date));
+    return {
+      blockHours: sumBlockHours(events),
+      flightDays: flightDates.size,
+      sectors: sec,
+      standby: sb,
+      daysOff: off,
+      destinations: destSet.size,
+    };
+  }, [roster, pilot?.base]);
+
+  // Trips
+  const trips = useMemo(
+    () => roster && pilot ? buildTrips(roster, pilot.base) : [],
+    [roster, pilot],
   );
 
-  const dayMap = useMemo(
-    () => new Map(rosterDays.map(d => [d.date, d])),
-    [rosterDays],
+  // Destinations (unique non-base arrival airports)
+  const destinations = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Array<{ code: string; city: string; flag: string }> = [];
+    for (const e of roster?.events ?? []) {
+      if (e.type === 'FLIGHT' && e.arrPort && e.arrPort !== pilot?.base && !seen.has(e.arrPort)) {
+        seen.add(e.arrPort);
+        result.push({ code: e.arrPort, city: cityName(e.arrPort), flag: airportFlag(e.arrPort) });
+      }
+    }
+    return result;
+  }, [roster, pilot?.base]);
+
+  // UP NEXT (based on all rosters)
+  const upNext = useMemo(
+    () => apiData ? findUpNext(apiData.rosters, now, apiData.pilot.base) : null,
+    [apiData, now],
   );
-
-  const calCells = useMemo(
-    () => roster ? buildCalendarCells(roster) : [],
-    [roster],
-  );
-
-  const activeDay = useMemo(() => {
-    if (activeDate) return dayMap.get(activeDate) ?? null;
-    // Default to today if today is in this month, else first duty day
-    const todayDay = now.day;
-    const inThisMonth = roster
-      ? now.toFormat('MMMM yyyy') === `${roster.month} ${roster.year}`
-      : false;
-    if (inThisMonth && dayMap.has(todayDay)) return dayMap.get(todayDay)!;
-    return rosterDays.find(d => d.type !== 'rest') ?? rosterDays[0] ?? null;
-  }, [activeDate, dayMap, rosterDays, roster, now]);
-
-  const stats = useMemo(() => ({
-    flights:  rosterDays.filter(d => d.type === 'flight').length,
-    standby:  rosterDays.filter(d => d.type === 'standby').length,
-    sectors:  rosterDays.reduce((n, d) => n + d.sectors.length, 0),
-  }), [rosterDays]);
 
   // ── Loading ──
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#ededed] gap-3">
-        <Loader2 size={28} className="animate-spin text-sky-600" />
-        <p className="text-[12px] font-black uppercase tracking-[0.3em] text-slate-500">Loading roster…</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-board-ink">
+        <Loader2 size={28} className="animate-spin text-board-flight" />
+        <p className="font-jb text-[12px] uppercase tracking-[0.3em] text-board-muted">Loading roster…</p>
       </div>
     );
   }
 
   // ── Error ──
-  if (error || !apiData || !roster) {
+  if (error || !apiData || !roster || !pilot) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#ededed] p-8 text-center gap-4">
-        <div className="w-20 h-20 rounded-[2rem] bg-red-50 flex items-center justify-center">
-          <AlertCircle size={36} className="text-red-500" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-board-ink p-8 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-[2rem] bg-red-500/10">
+          <AlertCircle size={36} className="text-red-400" />
         </div>
         <div>
-          <h1 className="text-xl font-black text-slate-950 mb-2">
+          <h1 className="font-display text-xl font-extrabold text-board-text">
             {error === 'no-token' ? 'Missing link' : 'Link not found'}
           </h1>
-          <p className="text-[13px] text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
+          <p className="mx-auto mt-2 max-w-xs font-jb text-[13px] leading-relaxed text-board-muted">
             {error === 'no-token'
               ? 'This page needs a share link from the pilot.'
               : 'This link may have expired or been reset. Ask the pilot to share a new one.'}
@@ -540,7 +766,7 @@ export default function SpouseViewClient() {
         </div>
         <button
           onClick={() => window.location.reload()}
-          className="px-6 py-3 rounded-full border border-slate-200 bg-white text-[13px] font-black text-slate-500 hover:text-slate-900"
+          className="rounded-full border border-white/12 px-6 py-3 font-jb text-[13px] text-board-muted hover:text-board-text"
         >
           Try again
         </button>
@@ -548,170 +774,314 @@ export default function SpouseViewClient() {
     );
   }
 
-  const { pilot, rosters } = apiData;
-  const monthYear = `${roster.month} ${roster.year}`;
-  const todayLabel = getTodayLabel(rosters, now, pilot.base);
+  const monthLabel = `${roster.month.toUpperCase()} ${roster.year}`;
+  const initials   = pilot.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const upNextLabel = upNext
+    ? upNext.daysAway === 0 ? 'DEPARTS TODAY'
+    : upNext.daysAway === 1 ? 'DEPARTS TOMORROW'
+    : `DEPARTS IN ${upNext.daysAway} DAYS`
+    : null;
 
   return (
-    <main className="min-h-screen bg-[#ededed] px-3 py-6 text-slate-950">
-      <div className="mx-auto w-full max-w-7xl space-y-4">
+    <div className="relative min-h-screen overflow-x-hidden bg-board-ink px-4 py-7 font-display text-board-text sm:px-6 md:py-10">
+      {/* Atmospheric glows */}
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background: [
+            'radial-gradient(900px 600px at 12% -8%, rgba(56,189,248,.14), transparent 60%)',
+            'radial-gradient(800px 500px at 92% 0%, rgba(245,181,68,.10), transparent 55%)',
+            'radial-gradient(600px 600px at 80% 100%, rgba(192,132,252,.07), transparent 60%)',
+          ].join(', '),
+        }}
+      />
+      {/* Grain overlay */}
+      <div
+        className="pointer-events-none fixed inset-0 mix-blend-overlay"
+        style={{
+          opacity: 0.035,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        }}
+      />
 
-        {/* ── Top header ── */}
-        <header className="rounded-[2rem] border border-black/10 bg-[#f7f7f7] p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.42em] text-slate-400">Crew roster</p>
-              <h1 className="mt-1 text-2xl font-black tracking-[0.12em] text-zinc-800 sm:text-3xl uppercase">
-                {monthYear}
-              </h1>
-              <p className="mt-1 text-[12px] font-bold text-slate-400">{pilot.full_name}{pilot.rank ? ` · ${pilot.rank}` : ''} · {todayLabel}</p>
+      <div className="relative mx-auto max-w-[1080px]">
+
+        {/* ── Ribbon ── */}
+        <div className="mb-4 flex items-center justify-between font-jb text-[11px] tracking-[.08em] text-board-muted">
+          <span className="inline-flex items-center gap-2 font-semibold text-board-dayoff">
+            <span className="h-[7px] w-[7px] rounded-full bg-board-dayoff shadow-[0_0_10px_#34D399]" />
+            LIVE · READ-ONLY VIEW
+          </span>
+          <span className="text-board-faint">
+            Shared via <b className="font-bold text-board-text">Otarosta</b>
+          </span>
+        </div>
+
+        {/* ── Header ── */}
+        <header className="mb-5 flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <div className="font-jb text-[11px] font-semibold tracking-[.22em] text-board-gold">
+              CREW ROSTER · {pilot.base} BASE
             </div>
-            <div className="flex items-center gap-2">
-              {/* Month picker */}
-              {rosters.length > 1 && (
-                <div className="flex items-center gap-1">
-                  <button
-                    disabled={selectedIdx >= rosters.length - 1}
-                    onClick={() => { setSelectedIdx(i => i + 1); setActiveDate(null); }}
-                    className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center disabled:opacity-30 shadow-sm"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <button
-                    disabled={selectedIdx <= 0}
-                    onClick={() => { setSelectedIdx(i => i - 1); setActiveDate(null); }}
-                    className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center disabled:opacity-30 shadow-sm"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
-              <div className="inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 text-[12px] font-black text-green-700">
-                <Check className="h-4 w-4" /> Synced
+            <div className="-ml-[6px] mt-1.5 flex items-center gap-1">
+              <NavBtn disabled={rosterIdx <= 0} onClick={() => setRosterIdx(i => i - 1)}>
+                <ChevronLeft size={16} />
+              </NavBtn>
+              <h1 className="m-0 font-display text-[36px] font-extrabold leading-none tracking-[-.02em] sm:text-[48px]">
+                {monthLabel}
+              </h1>
+              <NavBtn disabled={rosterIdx >= rosters.length - 1} onClick={() => setRosterIdx(i => i + 1)}>
+                <ChevronRight size={16} />
+              </NavBtn>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="grid h-[36px] w-[36px] place-items-center rounded-xl border border-board-gold/30 bg-gradient-to-br from-[#1c2438] to-[#0e1424] font-jb text-[13px] font-bold text-board-gold">
+                {initials}
+              </span>
+              <div>
+                <div className="text-[15px] font-bold text-board-text">{pilot.full_name}</div>
+                {(pilot.rank || pilot.airline) && (
+                  <div className="font-jb text-[12px] text-board-muted">
+                    {[pilot.rank, pilot.airline].filter(Boolean).join(' · ').toUpperCase()}
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-board-dayoff/25 bg-board-dayoff/10 px-3 py-[7px] font-jb text-[11px] font-semibold tracking-[.05em] text-board-dayoff">
+              <Check size={12} strokeWidth={3} /> SYNCED
+            </span>
           </div>
         </header>
 
-        {/* ── Detail card — above the calendar ── */}
-        <div className="mx-auto w-full max-w-xl">
-          <AnimatePresence mode="wait">
-            {activeDay && (
-              <RosterDetailCard
-                key={activeDay.dateStr}
-                day={activeDay}
-                monthYear={monthYear}
-                todayStr={todayStr}
-              />
-            )}
-          </AnimatePresence>
+        {/* ── UP NEXT hero ── */}
+        {upNext && upNextLabel && (
+          <section className="relative mb-5 overflow-hidden rounded-[20px] border border-white/7 bg-gradient-to-br from-[rgba(20,28,46,.9)] to-[rgba(12,17,30,.7)] px-6 py-6">
+            {/* Gold glow */}
+            <div
+              className="pointer-events-none absolute -right-10 -top-16 h-[260px] w-[260px] rounded-full"
+              style={{ background: 'radial-gradient(circle, rgba(245,181,68,.2), transparent 65%)' }}
+            />
+            <div className="relative">
+              <div className="mb-4 inline-flex items-center gap-2 font-jb text-[11px] font-semibold tracking-[.14em] text-board-gold">
+                <Moon size={12} /> UP NEXT · {upNextLabel}
+              </div>
+              {/* Route */}
+              <div className="flex max-w-[520px] items-center justify-between">
+                <div>
+                  <div className="font-display text-[40px] font-extrabold leading-none tracking-[-.02em] sm:text-[46px]">
+                    {upNext.fromCode}
+                  </div>
+                  <div className="mt-1 font-jb text-[12px] text-board-muted">{upNext.fromCity}</div>
+                </div>
+                <div className="flex flex-1 flex-col items-center gap-1 px-4">
+                  <span
+                    className="h-0.5 w-full rounded"
+                    style={{ background: 'repeating-linear-gradient(90deg,rgba(245,181,68,.5) 0 6px,transparent 6px 12px)' }}
+                  />
+                  <Plane size={16} className="rotate-45 text-board-gold" />
+                  <span className="font-jb text-[10px] tracking-[.1em] text-board-faint">{upNext.ac}</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-display text-[40px] font-extrabold leading-none tracking-[-.02em] sm:text-[46px]">
+                    {upNext.toCode}
+                  </div>
+                  <div className="mt-1 font-jb text-[12px] text-board-muted">{upNext.toCity}</div>
+                </div>
+              </div>
+              {/* Meta row */}
+              <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3">
+                <MetaPill label="FLIGHT"  value={upNext.flightNo} />
+                {upNext.report !== '—' && <MetaPill label="REPORT"  value={upNext.report} />}
+                {upNext.std    !== '—' && <MetaPill label="STD"     value={upNext.std} />}
+                {upNext.arr    !== '—' && <MetaPill label="ARR"     value={upNext.arr} />}
+                {upNext.layoverNights > 0 && (
+                  <MetaPill label="LAYOVER" value={`${upNext.layoverNights} night${upNext.layoverNights > 1 ? 's' : ''}`} accent />
+                )}
+                {upNext.overnight && upNext.layoverNights === 0 && (
+                  <MetaPill label="RETURN" value="Next day" accent />
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Stats snapshot ── */}
+        <section className="mb-5 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <StatCard icon={Gauge}       value={stats.blockHours} label="BLOCK HRS"   sub="this month" />
+          <StatCard icon={PlaneTakeoff} value={stats.flightDays} label="FLIGHT DAYS" color="text-board-flight" />
+          <StatCard icon={Layers}      value={stats.sectors}    label="SECTORS"     color="text-board-flight" />
+          <StatCard icon={ShieldAlert} value={stats.standby}    label="STANDBY"     color="text-board-standby" />
+          <StatCard icon={Bed}         value={stats.daysOff}    label="DAYS OFF"    color="text-board-dayoff" />
+          <StatCard icon={MapPin}      value={stats.destinations} label="DEST."     color="text-board-gold" />
+        </section>
+
+        {/* ── Calendar / Trips toggle ── */}
+        <div className="mb-4 flex justify-center">
+          <div className="inline-flex gap-1 rounded-[12px] border border-white/7 bg-white/[.04] p-1">
+            {(['grid', 'trips'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={[
+                  'inline-flex items-center gap-[7px] rounded-[9px] px-4 py-[8px] font-jb text-[13px] transition-colors',
+                  view === v ? 'bg-board-text font-bold text-board-ink' : 'font-semibold text-board-muted hover:text-board-text',
+                ].join(' ')}
+              >
+                {v === 'grid' ? <><CalendarDays size={13} /> Calendar</> : <><Plane size={13} /> Trips</>}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* ── Calendar + bottom sections ── */}
-        <div className="space-y-4">
-
-            {/* Calendar grid */}
-            <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm sm:p-6">
-              {/* DOW headers */}
-              <div className="mb-3 grid grid-cols-7 gap-1.5 text-center sm:gap-2">
-                {DOW.map(d => (
-                  <div key={d} className="text-[9px] font-black uppercase tracking-widest text-zinc-300 sm:text-[10px] py-1">
-                    {d}
-                  </div>
-                ))}
-              </div>
-
-              {/* Day cells */}
-              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                {calCells.map((date, idx) => {
-                  if (!date) return <div key={`pad-${idx}`} className="aspect-square" />;
-
-                  const day   = dayMap.get(date);
-                  const type  = day?.type ?? 'rest';
-                  const hasDuty = !!day && type !== 'rest';
-                  const isActive = activeDate === date || (!activeDate && activeDay?.date === date);
-                  const dateStr  = roster
+        {/* ── Calendar grid ── */}
+        {view === 'grid' && (
+          <section className="rounded-[20px] border border-white/7 bg-white/[.015] p-3 sm:p-4">
+            {/* DOW headers */}
+            <div className="mb-2 grid grid-cols-7 gap-1.5 px-0.5">
+              {DOW.map((d, i) => (
+                <div
+                  key={d}
+                  className={`pl-1 font-jb text-[9px] tracking-[.12em] sm:text-[10.5px] ${i >= 5 ? 'text-board-gold' : 'text-board-faint'}`}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            {/* Weeks */}
+            {weeks.map((week, wi) => (
+              <div key={wi} className="mb-1.5 grid grid-cols-7 gap-1.5">
+                {week.map((d, di) => {
+                  const dateStr = d
                     ? DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy')
-                        .set({ day: date }).toFormat('yyyy-MM-dd')
+                        .set({ day: d }).toFormat('yyyy-MM-dd')
                     : '';
+                  const duty    = d ? buildDayDuty(eventMap.get(dateStr) ?? []) : null;
                   const isToday = dateStr === todayStr;
-
+                  const dateLabel = d
+                    ? DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy')
+                        .set({ day: d }).toFormat('MMM d · yyyy').toUpperCase()
+                    : '';
                   return (
-                    <motion.button
-                      key={date}
-                      type="button"
-                      onMouseEnter={() => setActiveDate(date)}
-                      onClick={() => setActiveDate(prev => prev === date ? null : date)}
-                      whileHover={{ y: -2 }}
-                      className={cn(
-                        'group relative aspect-square rounded-[1.2rem] transition-all sm:rounded-[1.5rem]',
-                        hasDuty
-                          ? isActive ? CELL_ACTIVE[type] : CELL_IDLE[type]
-                          : isToday
-                            ? 'bg-accent/15 ring-1 ring-accent text-accent hover:bg-accent/25'
-                            : 'bg-transparent text-zinc-300 hover:bg-zinc-100',
-                        isActive && hasDuty ? 'scale-105 z-10' : '',
-                      )}
-                    >
-                      <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                        <span className="text-[14px] font-black tracking-tight sm:text-[18px] leading-none">
-                          {date}
-                        </span>
-                        {hasDuty ? (
-                          <>
-                            <span className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-white/70' : DOT[type])} />
-                            <span className="hidden text-[8px] font-black uppercase tracking-wider opacity-70 sm:block leading-none">
-                              {day?.sectors.length && day.sectors.length > 0 ? `${day.sectors.length}×` : day?.label}
-                            </span>
-                          </>
-                        ) : (
-                          isToday && <span className="h-1.5 w-1.5 rounded-full bg-accent/50" />
-                        )}
-                      </div>
-                      {day?.continuesNextDay && (
-                        <span className="absolute bottom-1 right-1 rounded-full bg-white/80 p-0.5 text-slate-500 shadow-sm">
-                          <ChevronRight className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                    </motion.button>
+                    <DayCell
+                      key={di}
+                      day={d}
+                      duty={duty}
+                      isToday={isToday}
+                      onClick={() => {
+                        if (d && duty) setOpenDay({ dateLabel, duty });
+                      }}
+                    />
                   );
                 })}
               </div>
-            </section>
+            ))}
+            <Legend />
+          </section>
+        )}
 
-            {/* Stats */}
-            <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm sm:p-5">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Summary icon={<CalendarDays className="h-4 w-4" />} label="Month"       value={monthYear} />
-                <Summary icon={<Plane className="h-4 w-4" />}        label="Flight days"  value={String(stats.flights)} />
-                <Summary icon={<Clock3 className="h-4 w-4" />}       label="Standby"      value={String(stats.standby)} />
-                <Summary icon={<MapPin className="h-4 w-4" />}       label="Sectors"      value={String(stats.sectors)} />
+        {/* ── Trips view ── */}
+        {view === 'trips' && (
+          <section className="flex flex-col gap-2.5">
+            {trips.length === 0 ? (
+              <div className="rounded-[20px] border border-white/7 p-8 text-center font-jb text-[13px] text-board-muted">
+                No trips found for {roster.month} {roster.year}
               </div>
-            </section>
+            ) : trips.map((t, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  // Open modal for the first flight day of this trip
+                  const dateStr = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy')
+                    .set({ day: t.firstFlightDay }).toFormat('yyyy-MM-dd');
+                  const duty = buildDayDuty(eventMap.get(dateStr) ?? []);
+                  const dateLabel = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy')
+                    .set({ day: t.firstFlightDay }).toFormat('MMM d · yyyy').toUpperCase();
+                  if (duty) setOpenDay({ dateLabel, duty });
+                }}
+                className="flex w-full items-center gap-4 overflow-hidden rounded-[18px] border border-white/7 bg-white/[.02] pr-4 text-left transition-all hover:translate-x-0.5 hover:border-board-flight/30"
+              >
+                {/* Coloured left bar */}
+                <span className="w-[4px] self-stretch bg-board-flight rounded-l-[18px]" />
+                {/* Destination stub */}
+                <div className="min-w-[110px] border-r border-dashed border-white/10 py-4 pr-4 sm:min-w-[130px]">
+                  <div className="font-display text-xl font-extrabold sm:text-2xl">
+                    {t.destFlag} {t.destCode}
+                  </div>
+                  <div className="mt-0.5 font-jb text-[11px] text-board-muted">{t.destCity}</div>
+                </div>
+                {/* Range + schedule */}
+                <div className="min-w-[120px]">
+                  <div className="font-jb text-[13px] font-semibold text-board-text">{t.range}</div>
+                  <div className="mt-[3px] font-jb text-[11px] text-board-faint">{t.sched}</div>
+                </div>
+                {/* Tags */}
+                <div className="flex flex-1 flex-wrap gap-1.5">
+                  {([
+                    t.type,
+                    `${t.sectors} sector${t.sectors > 1 ? 's' : ''}`,
+                  ]).map(tag => (
+                    <span key={tag} className="rounded-lg border border-white/10 px-[9px] py-[5px] font-jb text-[10px] text-board-muted">
+                      {tag}
+                    </span>
+                  ))}
+                  {t.nights > 0
+                    ? <span className="rounded-lg border border-board-gold/30 px-[9px] py-[5px] font-jb text-[10px] text-board-gold">{t.nights}N layover</span>
+                    : <span className="rounded-lg border border-board-dayoff/25 px-[9px] py-[5px] font-jb text-[10px] text-board-dayoff">Same-day</span>
+                  }
+                </div>
+                <ArrowRight size={16} className="shrink-0 text-board-faint" />
+              </button>
+            ))}
+          </section>
+        )}
 
-            {/* Legend */}
-            <section className="rounded-[2rem] border border-black/10 bg-white p-4 shadow-sm">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-[11px] font-bold text-slate-600">
-                <div className="flex items-center gap-2 rounded-2xl bg-sky-100 px-3 py-2">
-                  <span className="h-3 w-3 rounded-full bg-sky-500 shrink-0" />Blue = Flight
+        {/* ── Destinations passport ── */}
+        {destinations.length > 0 && (
+          <section className="mt-5 rounded-[20px] border border-white/7 bg-white/[.015] px-5 py-5">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 font-jb text-[12px] font-semibold tracking-[.1em] text-board-text">
+                <Sparkles size={14} className="text-board-gold" /> DESTINATIONS THIS MONTH
+              </span>
+              <span className="font-jb text-[11px] text-board-faint">
+                {destinations.length} {destinations.length === 1 ? 'CITY' : 'CITIES'}
+              </span>
+            </div>
+            <div className={`grid gap-3 ${destinations.length <= 3 ? 'grid-cols-3' : 'grid-cols-3 sm:grid-cols-6'}`}>
+              {destinations.map(d => (
+                <div
+                  key={d.code}
+                  className="rounded-[14px] border border-dashed border-board-gold/25 bg-board-gold/[.03] px-2 py-4 text-center"
+                >
+                  <div className="text-[24px] sm:text-[26px]">{d.flag}</div>
+                  <div className="mt-1.5 font-display text-lg font-extrabold sm:text-xl">{d.code}</div>
+                  <div className="mt-0.5 font-jb text-[10px] text-board-muted">{d.city}</div>
                 </div>
-                <div className="flex items-center gap-2 rounded-2xl bg-amber-100 px-3 py-2">
-                  <span className="h-3 w-3 rounded-full bg-amber-500 shrink-0" />Yellow = Standby
-                </div>
-                <div className="flex items-center gap-2 rounded-2xl bg-emerald-100 px-3 py-2">
-                  <span className="h-3 w-3 rounded-full bg-emerald-500 shrink-0" />Green = Day off
-                </div>
-                <div className="flex items-center gap-2 rounded-2xl bg-fuchsia-100 px-3 py-2">
-                  <span className="h-3 w-3 rounded-full bg-fuchsia-500 shrink-0" />Purple = Training
-                </div>
-              </div>
-            </section>
-          </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-        <p className="text-center text-[11px] font-bold text-slate-400 pb-2">
-          Shared via Otarosta · Live read-only view
-        </p>
+        {/* ── Footer ── */}
+        <footer className="mt-7 flex flex-wrap items-center justify-between gap-2 border-t border-white/[.06] pt-4 font-jb text-[11px] text-board-muted">
+          <span>Otarosta · Your roster, transformed.</span>
+          <span className="text-board-faint">Live read-only view</span>
+        </footer>
       </div>
-    </main>
+
+      {/* ── Day detail modal ── */}
+      <AnimatePresence>
+        {openDay && (
+          <DayModal
+            dateLabel={openDay.dateLabel}
+            duty={openDay.duty}
+            onClose={() => setOpenDay(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

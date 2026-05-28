@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "../styles/globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
@@ -15,6 +15,23 @@ const inter = Inter({
   weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
   preload: true,
+});
+
+// Used exclusively on the family-share departure-board page (/roster/view)
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
+  display: "swap",
+  preload: false, // loaded only when the page is visited
+});
+
+const jetbrains = JetBrains_Mono({
+  variable: "--font-jetbrains",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  preload: false,
 });
 
 
@@ -69,7 +86,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${bricolage.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <head>
         {/* Preconnect to external origins used at runtime */}
