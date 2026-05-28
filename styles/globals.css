@@ -4,21 +4,6 @@
   --font-sans: var(--font-inter);
   --font-mono: var(--font-inter);
 
-  /* ── Departure-board page fonts (family share view) ─────────────────────── */
-  --font-display: var(--font-bricolage);  /* Bricolage Grotesque → font-display */
-  --font-jb:      var(--font-jetbrains); /* JetBrains Mono      → font-jb      */
-
-  /* ── Departure-board palette (board- prefix avoids collision) ───────────── */
-  --color-board-ink:      #070B16;
-  --color-board-text:     #E9EDF7;
-  --color-board-muted:    #8A93A6;
-  --color-board-faint:    #5A6376;
-  --color-board-gold:     #F5B544;
-  --color-board-flight:   #38BDF8;
-  --color-board-standby:  #FBBF24;
-  --color-board-dayoff:   #34D399;
-  --color-board-training: #C084FC;
-
   /* Surfaces */
   --color-bg: var(--bg);
   --color-surface: var(--surface);
