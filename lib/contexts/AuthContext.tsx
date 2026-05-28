@@ -13,6 +13,7 @@ export interface Profile {
   base?: string
   bio?: string
   avatar_url?: string
+  spouse_share_token?: string | null
 }
 
 interface AuthContextType {
