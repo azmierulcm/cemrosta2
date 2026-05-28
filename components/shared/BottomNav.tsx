@@ -21,7 +21,7 @@ export function BottomNav() {
   // Only authenticated users get the bottom nav.
   // Unauthenticated visitors see the top Navbar on the landing page instead.
   if (!user) return null
-  if (pathname.startsWith('/admin') || pathname.startsWith('/demo')) return null
+  if (pathname.startsWith('/admin') || pathname.startsWith('/demo') || pathname.startsWith('/roster/view')) return null
 
   return (
     <nav
