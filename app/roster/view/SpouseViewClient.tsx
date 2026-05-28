@@ -117,12 +117,28 @@ function isOvernight(f: DutyEvent) {
   return !!(f.std && f.sta && f.sta < f.std);
 }
 
+/**
+ * Parse a roster month/year pair into a Luxon DateTime.
+ * Handles every format the MAS-AIMS parser emits:
+ *   "MAY" / "APR"  — 3-letter uppercase (most common)
+ *   "May" / "April" — already-cased or full month name
+ */
+function parseRosterMonth(month: string, year: string): DateTime {
+  // Normalise to title-case so Luxon locale matching is unambiguous
+  const m = month.trim();
+  const cap = m.charAt(0).toUpperCase() + m.slice(1).toLowerCase();
+  // Try abbreviated first (MMM = Jan/Feb/Mar … Dec) — handles APR→Apr, MAY→May
+  const short = DateTime.fromFormat(`${cap} ${year}`, 'MMM yyyy');
+  if (short.isValid) return short;
+  // Fallback for full names already stored correctly (January, February …)
+  return DateTime.fromFormat(`${cap} ${year}`, 'MMMM yyyy');
+}
+
 function sortRostersChronologically(rosters: SharedRoster[]): SharedRoster[] {
-  return [...rosters].sort((a, b) => {
-    const dtA = DateTime.fromFormat(`${a.month} ${a.year}`, 'MMMM yyyy');
-    const dtB = DateTime.fromFormat(`${b.month} ${b.year}`, 'MMMM yyyy');
-    return dtA.toMillis() - dtB.toMillis();
-  });
+  return [...rosters].sort((a, b) =>
+    parseRosterMonth(a.month, a.year).toMillis() -
+    parseRosterMonth(b.month, b.year).toMillis()
+  );
 }
 
 // ─── Build RosterDay ──────────────────────────────────────────────────────────
@@ -200,7 +216,7 @@ function buildDay(dateStr: string, events: DutyEvent[], base: string): RosterDay
 }
 
 function buildRosterDays(roster: SharedRoster, base: string): RosterDay[] {
-  const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
+  const start = parseRosterMonth(roster.month, roster.year);
   if (!start.isValid) return [];
   const em = new Map<string, DutyEvent[]>();
   for (const e of roster.events ?? []) {
@@ -216,7 +232,7 @@ function buildRosterDays(roster: SharedRoster, base: string): RosterDay[] {
 }
 
 function buildCalendarMatrix(roster: SharedRoster): (number | null)[][] {
-  const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
+  const start = parseRosterMonth(roster.month, roster.year);
   if (!start.isValid) return [];
   const offset = start.weekday === 7 ? 6 : start.weekday - 1;
   const flat: (number | null)[] = Array(offset).fill(null);
@@ -548,8 +564,11 @@ export default function SpouseViewClient() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Failed to load');
         const rosters = sortRostersChronologically(json.rosters ?? []);
-        const todayFmt = now.toFormat('MMMM yyyy');
-        const idx      = rosters.findIndex(r => `${r.month} ${r.year}` === todayFmt);
+        // Match by numeric month+year — immune to "APR" vs "April" casing
+        const idx = rosters.findIndex(r => {
+          const dt = parseRosterMonth(r.month, r.year);
+          return dt.isValid && dt.month === now.month && dt.year === now.year;
+        });
         setRosterIdx(idx >= 0 ? idx : rosters.length - 1);
         setApiData({ ...json, rosters });
       })
@@ -585,11 +604,12 @@ export default function SpouseViewClient() {
    *   6. null → placeholder
    */
   const displayDay = useMemo((): RosterDay | null => {
+    const rosterStart = roster ? parseRosterMonth(roster.month, roster.year) : null;
+
     const resolveDate = (dateStr: string | null): RosterDay | null => {
-      if (!dateStr || !roster) return null;
-      const dt    = DateTime.fromISO(dateStr);
-      const start = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
-      if (dt.month !== start.month || dt.year !== start.year) return null;
+      if (!dateStr || !rosterStart?.isValid) return null;
+      const dt = DateTime.fromISO(dateStr);
+      if (dt.month !== rosterStart.month || dt.year !== rosterStart.year) return null;
       return dayMap.get(dt.day) ?? null;
     };
 
@@ -597,10 +617,9 @@ export default function SpouseViewClient() {
       resolveDate(hoveredDate) ??
       resolveDate(activeDate) ??
       (() => {
-        if (!roster) return null;
-        const start   = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy');
+        if (!rosterStart?.isValid) return null;
         const todayDt = DateTime.fromISO(todayStr);
-        if (todayDt.month === start.month && todayDt.year === start.year) {
+        if (todayDt.month === rosterStart.month && todayDt.year === rosterStart.year) {
           const t = dayMap.get(todayDt.day);
           if (t) return t;
         }
@@ -657,8 +676,9 @@ export default function SpouseViewClient() {
     );
   }
 
-  const monthYear = `${roster.month} ${roster.year}`;
-  const monthAbbr = `${roster.month.slice(0, 3).toUpperCase()} ${roster.year}`;
+  const rosterDt  = parseRosterMonth(roster.month, roster.year);
+  const monthYear = rosterDt.isValid ? rosterDt.toFormat('MMMM yyyy') : `${roster.month} ${roster.year}`;
+  const monthAbbr = rosterDt.isValid ? rosterDt.toFormat('MMM yyyy').toUpperCase() : `${roster.month} ${roster.year}`;
   const initials  = pilot.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
@@ -747,7 +767,7 @@ export default function SpouseViewClient() {
             {weeks.map((week, wi) =>
               week.map((d, di) => {
                 if (!d) return <div key={`pad-${wi}-${di}`} />;
-                const dateStr = DateTime.fromFormat(`${roster.month} ${roster.year}`, 'MMMM yyyy')
+                const dateStr = parseRosterMonth(roster.month, roster.year)
                   .set({ day: d }).toFormat('yyyy-MM-dd');
                 const rday    = dayMap.get(d) ?? null;
                 return (
