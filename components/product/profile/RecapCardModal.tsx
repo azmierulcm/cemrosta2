@@ -87,6 +87,8 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
   const [format, setFormat] = useState<RecapFormat>('stories');
   const [isCopied, setIsCopied] = useState(false);
   const [imgState, setImgState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [stampsImgState, setStampsImgState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const stampsUrl = `/api/recap/${userId}/stamps/stories`;
 
   const periodKeys = recentPeriodKeys(periodType, 6);
   const [selectedKey, setSelectedKey] = useState<string>(periodKeys[0] ?? '');
@@ -122,20 +124,30 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
   };
 
   const handleShare = async () => {
+    const shareUrl = window.location.origin + imageUrl;
     if (navigator.share) {
       try {
         await navigator.share({
           title: `My ${periodLabel} Mission Recap`,
           text: 'Check out my flight stats on Otarosta!',
-          url: window.location.origin + imageUrl,
+          url: shareUrl,
         });
+        return;
       } catch {
-        /* ignore */
+        /* fall through to clipboard copy */
       }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      /* ignore */
     }
   };
 
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingStamps, setIsDownloadingStamps] = useState(false);
 
   const handleDownload = async () => {
     if (isDownloading) return;
@@ -156,6 +168,28 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
       console.error('[RecapCardModal] download failed', err);
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadStamps = async () => {
+    if (isDownloadingStamps) return;
+    setIsDownloadingStamps(true);
+    try {
+      const res = await fetch(`${stampsUrl}?download=1`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = 'Stamps-Collection.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('[RecapCardModal] stamps download failed', err);
+    } finally {
+      setIsDownloadingStamps(false);
     }
   };
 
@@ -285,6 +319,43 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
                   onError={() => setImgState('error')}
                 />
               </div>
+
+              {/* ── Stamps card (Stories format only) ── */}
+              {format === 'stories' && (
+                <div className="mt-4 w-full flex flex-col items-center">
+                  <p className="text-[10px] font-[800] uppercase tracking-widest text-text-muted mb-3">
+                    Stamp Collection Card
+                  </p>
+                  <div
+                    className="relative bg-surface-2 rounded-2xl overflow-hidden shadow-xl border border-border flex items-center justify-center"
+                    style={{ aspectRatio: '9/16', height: 480 }}
+                  >
+                    {stampsImgState === 'loading' && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+                        <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+                        <p className="text-[11px] font-[600] text-text-muted uppercase tracking-widest">Rendering…</p>
+                      </div>
+                    )}
+                    {stampsImgState === 'error' && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center z-10">
+                        <p className="text-[13px] font-[700] text-text">No stamps yet</p>
+                        <p className="text-[11px] text-text-muted leading-snug">Upload a roster to collect destination stamps.</p>
+                      </div>
+                    )}
+                    <Image
+                      key={stampsUrl}
+                      src={stampsUrl}
+                      alt="Stamps collection"
+                      fill
+                      unoptimized={stampsImgState !== 'ok'}
+                      className="object-cover transition-opacity duration-300"
+                      style={{ opacity: stampsImgState === 'ok' ? 1 : 0 }}
+                      onLoad={() => setStampsImgState('ok')}
+                      onError={() => setStampsImgState('error')}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── Right: Actions ── */}
@@ -325,9 +396,28 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
                 >
                   {isDownloading
                     ? <><div className="w-5 h-5 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Downloading…</>
-                    : <><Download size={20} strokeWidth={2.5} /> Download PNG</>
+                    : <><Download size={20} strokeWidth={2.5} /> Download recap PNG</>
                   }
                 </button>
+
+                {format === 'stories' && (
+                  <button
+                    onClick={handleDownloadStamps}
+                    disabled={isDownloadingStamps || stampsImgState !== 'ok'}
+                    className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[700] transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{
+                      background: 'var(--accent)',
+                      color: 'var(--accent-fg)',
+                      fontSize: 16,
+                      padding: '16px 24px',
+                    }}
+                  >
+                    {isDownloadingStamps
+                      ? <><div className="w-5 h-5 rounded-full border-2 border-white/40 border-t-white animate-spin" /> Downloading…</>
+                      : <><Download size={20} strokeWidth={2.5} /> Download stamps PNG</>
+                    }
+                  </button>
+                )}
 
                 <button
                   onClick={handleCopy}
@@ -340,16 +430,14 @@ export function RecapCardModal({ isOpen, onClose, userId }: RecapCardModalProps)
                   {isCopied ? 'Link copied!' : 'Copy link'}
                 </button>
 
-                {typeof navigator !== 'undefined' && !!navigator.share && (
-                  <button
-                    onClick={handleShare}
-                    className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[600] border border-border transition-all active:scale-95 hover:bg-surface-2"
-                    style={{ fontSize: 15, padding: '14px 24px', color: 'var(--text)' }}
-                  >
-                    <Share2 size={18} />
-                    Share directly
-                  </button>
-                )}
+                <button
+                  onClick={handleShare}
+                  className="flex items-center justify-center gap-3 rounded-[var(--radius-pill)] font-[600] border border-border transition-all active:scale-95 hover:bg-surface-2"
+                  style={{ fontSize: 15, padding: '14px 24px', color: 'var(--text)' }}
+                >
+                  <Share2 size={18} />
+                  Share directly
+                </button>
               </div>
 
               <p

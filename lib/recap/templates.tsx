@@ -400,3 +400,121 @@ export function CardTemplate({
     </div>
   );
 }
+
+// ── Stamps template (1080 × 1920 — 9:16) ─────────────────────────────────────
+// Shows all earned destination stamps in a grid.
+// If earned > MAX_GRID_STAMPS, falls back to a large count display.
+
+const MAX_GRID_STAMPS = 54; // 6 cols × 9 rows
+const STAMP_COLS      = 6;
+
+export function StampsTemplate({
+  earnedIata,
+  totalCatalog,
+  crewHandle,
+  baseUrl = '',
+  watermark = true,
+}: {
+  earnedIata: string[];
+  totalCatalog: number;
+  crewHandle: string;
+  baseUrl?: string;
+  watermark?: boolean;
+}) {
+  const showGrid  = earnedIata.length <= MAX_GRID_STAMPS;
+  const rows: string[][] = [];
+  if (showGrid) {
+    for (let i = 0; i < earnedIata.length; i += STAMP_COLS) {
+      rows.push(earnedIata.slice(i, i + STAMP_COLS));
+    }
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+        backgroundImage: BG_GRAD,
+        backgroundColor: BG_SOLID,
+        color: PARCHMENT,
+        fontFamily: 'sans-serif',
+      }}
+    >
+      {/* Top perf */}
+      <div style={{ display: 'flex', padding: '56px 80px 0' }}>{PERF_DIV}</div>
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '40px 80px 36px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', fontSize: 18, fontWeight: 800, color: GOLD_DIM, letterSpacing: '0.38em', textTransform: 'uppercase', fontFamily: MONO }}>
+            Otarosta
+          </div>
+          <div style={{ display: 'flex', fontSize: 42, fontWeight: 700, color: PARCHMENT }}>
+            Stamp Collection
+          </div>
+        </div>
+        {/* Count badge */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <div style={{ display: 'flex', fontSize: 64, fontWeight: 900, color: PARCHMENT, fontFamily: MONO, letterSpacing: '-0.04em', lineHeight: 1 }}>
+            {earnedIata.length}
+          </div>
+          <div style={{ display: 'flex', fontSize: 22, fontWeight: 700, color: GOLD_DIM, fontFamily: MONO, letterSpacing: '0.1em' }}>
+            / {totalCatalog} stamps
+          </div>
+        </div>
+      </div>
+
+      {/* Mid perf */}
+      <div style={{ display: 'flex', padding: '0 80px' }}>{PERF_DIV}</div>
+
+      {/* Stamp grid or count fallback */}
+      <div style={{ display: 'flex', flex: 1, flexDirection: 'column', justifyContent: 'center', padding: '48px 80px' }}>
+        {showGrid ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            {rows.map((row, ri) => (
+              <div key={ri} style={{ display: 'flex', gap: 28, justifyContent: 'flex-start' }}>
+                {row.map((iata) => (
+                  <PatchMedallion key={iata} iata={iata} size={120} baseUrl={baseUrl} labelSize={14} />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Too many to show individually — big count display */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 240, height: 240, borderRadius: 120, borderWidth: 2, borderStyle: 'solid', borderColor: GOLD_DIM, backgroundColor: 'rgba(200,168,75,0.08)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'flex', fontSize: 100, fontWeight: 900, color: GOLD, fontFamily: MONO, lineHeight: 1, letterSpacing: '-0.04em' }}>
+                  {earnedIata.length}
+                </div>
+                <div style={{ display: 'flex', fontSize: 28, fontWeight: 700, color: GOLD_DIM, fontFamily: MONO, letterSpacing: '0.1em' }}>
+                  stamps
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', fontSize: 36, fontWeight: 700, color: PARCHMENT_DIM, fontFamily: MONO }}>
+              out of {totalCatalog} collected
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Crew handle */}
+      <div style={{ display: 'flex', padding: '0 80px 28px' }}>
+        <div style={{ display: 'flex', fontSize: 28, fontWeight: 700, color: PARCHMENT_DIM }}>
+          {crewHandle}
+        </div>
+      </div>
+
+      {/* Bottom perf */}
+      <div style={{ display: 'flex', padding: '0 80px' }}>{PERF_DIV}</div>
+
+      {/* Footer */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '28px 80px 56px' }}>
+        {watermark && <BrandBadge scale={1.3} />}
+      </div>
+    </div>
+  );
+}

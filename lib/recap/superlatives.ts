@@ -80,21 +80,19 @@ export function getTopSuperlative(
     });
   }
 
-  // ── 4. Commuter — Most frequent route ────────────────────────────────────
-  const routeCounts = flights.reduce<Record<string, number>>((acc, f) => {
-    const route = `${f.depPort}-${f.arrPort}`;
-    acc[route] = (acc[route] ?? 0) + 1;
+  // ── 4. Most Visited City — destination with most landings ────────────────
+  const destVisits = flights.reduce<Record<string, number>>((acc, f) => {
+    if (f.arrPort) acc[f.arrPort] = (acc[f.arrPort] ?? 0) + 1;
     return acc;
   }, {});
-  const topRoute = Object.entries(routeCounts).sort((a, b) => b[1] - a[1])[0];
-  if (topRoute && topRoute[1] >= 4) {
-    const [dep, arr] = topRoute[0].split('-');
+  const topCity = Object.entries(destVisits).sort((a, b) => b[1] - a[1])[0];
+  if (topCity && topCity[1] >= 2) {
     candidates.push({
       key: 'commuter',
-      label: 'Favourite Route',
-      value: `${dep} ↔ ${arr}`,
-      subValue: `${topRoute[1]} times this period`,
-      score: topRoute[1] >= 10 ? 80 : topRoute[1] >= 6 ? 55 : 30,
+      label: 'Most Visited City',
+      value: topCity[0],
+      subValue: `${topCity[1]} visits this period`,
+      score: topCity[1] >= 10 ? 80 : topCity[1] >= 6 ? 55 : 30,
     });
   }
 

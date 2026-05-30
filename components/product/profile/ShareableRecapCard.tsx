@@ -81,7 +81,7 @@ const ShareableRecapCard = ({ roster }: { roster: RosterData }) => {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-text">SKY-SCHEDULE.COM</p>
+              <p className="text-[10px] font-bold text-text">OTAROSTA.COM</p>
               <p className="text-[8px] font-medium text-text-subtle">@muhammad.azmierul</p>
             </div>
           </div>

@@ -1,187 +1,477 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Pause, Play } from 'lucide-react';
+import { X, Pause, Play, Volume2, VolumeX, Globe, Award, Plane, Clock, Star } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { useRoster } from '@/lib/contexts/RosterContext';
+import { getLifetimeDestinations } from '@/lib/actions/destinations';
+import { computeLifetimeStats } from '@/lib/utils/stats';
+import { formatKilometers, formatBlockHours } from '@/lib/utils/format';
 
-const SLIDES = [
-  { id: 1, type: 'text', title: "Your 2026 in the air.", sub: "Welcome back, Muhammad Azmierul." },
-  { id: 2, type: 'stat', label: "Total Distance", value: "142,500", unit: "KM" },
-  { id: 3, type: 'quote', title: "That's 3.5 times around the earth.", sub: "A massive year of operations." },
-  { id: 4, type: 'stat', label: "Mission Hubs", value: "24", unit: "Cities" },
-  { id: 5, type: 'highlight', title: "Most Flown Route", sub: "Kuala Lumpur to London", meta: "14 Times" },
-  { id: 6, type: 'stat', label: "Sunrises Witnessed", value: "45", unit: "from FL370" },
-  { id: 7, type: 'stat', label: "Time in the Air", value: "932", unit: "Block Hours" },
-  { id: 8, type: 'stat', label: "Mission Colleagues", value: "142", unit: "Crew Members" },
-  { id: 9, type: 'highlight', title: "Longest Sector", sub: "LHR to KUL", meta: "13h 40m" },
-  { id: 10, type: 'achievement', title: "Rarest Moment", sub: "Equator Bound", meta: "Top 12% of Crew" },
-  { id: 11, type: 'text', title: "Ready for next year?", sub: "See you in 2027, First Officer Azmierul." },
+// Drop an ambient audio file at /public/audio/story-ambient.mp3 to enable music
+const MUSIC_SRC = '/audio/story-ambient.mp3';
+const SLIDE_MS = 4500;
+
+type SlideType = 'intro' | 'stat' | 'quote' | 'highlight' | 'achievement' | 'outro';
+
+interface Slide {
+  id: number;
+  type: SlideType;
+  label?: string;
+  title?: string;
+  sub?: string;
+  value?: string;
+  unit?: string;
+  meta?: string;
+  icon?: React.ElementType;
+}
+
+function buildSlides(
+  displayName: string,
+  km: number,
+  sectors: number,
+  blockMinutes: number,
+  cities: number,
+): Slide[] {
+  const firstName = displayName.split(' ')[0];
+  const year = new Date().getFullYear();
+  const earthLaps = (km / 40075).toFixed(1);
+
+  const slides: Slide[] = [
+    { id: 0, type: 'intro', title: `Your ${year}\nin the air.`, sub: `Welcome back, ${firstName}.` },
+  ];
+
+  if (km > 0) {
+    slides.push(
+      { id: slides.length, type: 'stat', label: 'Total Distance', value: formatKilometers(km), unit: 'KM', icon: Globe },
+      { id: slides.length, type: 'quote', title: `That's ${earthLaps}× around the earth.`, sub: km > 100_000 ? 'An incredible year of missions.' : 'A solid year of operations.' },
+    );
+  }
+
+  if (sectors > 0) {
+    slides.push({ id: slides.length, type: 'stat', label: 'Sectors Flown', value: sectors.toLocaleString(), unit: 'Flights', icon: Plane });
+  }
+
+  if (blockMinutes > 0) {
+    slides.push({ id: slides.length, type: 'stat', label: 'Time in the Air', value: formatBlockHours(blockMinutes), unit: 'Block Hours', icon: Clock });
+  }
+
+  if (cities > 0) {
+    slides.push({
+      id: slides.length,
+      type: 'highlight',
+      title: 'Cities Collected',
+      sub: `${cities} destinations in your passport`,
+      icon: Star,
+    });
+  }
+
+  slides.push({ id: slides.length, type: 'outro', title: 'Ready for next year?', sub: `See you in ${year + 1}, ${firstName}.` });
+
+  return slides;
+}
+
+const DEMO_SLIDES: Slide[] = [
+  { id: 0, type: 'intro', title: 'Your year\nin the air.', sub: 'Upload a roster to see your real stats.' },
+  { id: 1, type: 'stat', label: 'Total Distance', value: '—', unit: 'KM', icon: Globe },
+  { id: 2, type: 'stat', label: 'Sectors Flown', value: '—', unit: 'Flights', icon: Plane },
+  { id: 3, type: 'outro', title: 'Ready to begin?', sub: 'Upload your first roster.' },
 ];
 
-const StoryDeck = () => {
+/* ── Slide renderers ─────────────────────────────────────────────────────── */
+
+function IntroSlide({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <h2 className="text-5xl sm:text-6xl font-black text-white leading-tight mb-6 tracking-tighter whitespace-pre-line">{title}</h2>
+      <p className="text-xl text-passport-gold-soft font-medium italic">{sub}</p>
+    </div>
+  );
+}
+
+function StatSlide({ label, value, unit, icon: Icon }: Pick<Slide, 'label' | 'value' | 'unit' | 'icon'>) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-passport-secondary mb-8">{label}</p>
+      {Icon && <Icon className="w-8 h-8 text-passport-gold/40 mb-6" />}
+      <h2 className="text-8xl font-serif text-white mb-4 tracking-tighter tabular-nums">{value}</h2>
+      <p className="text-2xl font-black text-passport-gold uppercase tracking-widest italic">{unit}</p>
+    </div>
+  );
+}
+
+function QuoteSlide({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <h2 className="text-4xl font-serif italic text-white leading-relaxed mb-8">&ldquo;{title}&rdquo;</h2>
+      <p className="text-lg text-passport-secondary font-medium">{sub}</p>
+    </div>
+  );
+}
+
+function HighlightSlide({ title, sub, icon: Icon = Star }: Pick<Slide, 'title' | 'sub' | 'icon'>) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-passport-secondary mb-10">{title}</p>
+      <div className="w-28 h-28 rounded-3xl bg-passport-gold/10 border border-passport-gold/20 flex items-center justify-center mb-10">
+        <Icon className="text-passport-gold w-14 h-14" />
+      </div>
+      <h2 className="text-3xl font-black text-white mb-2">{sub}</h2>
+    </div>
+  );
+}
+
+function AchievementSlide({ title, sub, meta }: Pick<Slide, 'title' | 'sub' | 'meta'>) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-passport-secondary mb-10">Achievement Unlocked</p>
+      <div className="w-32 h-32 rounded-full bg-passport-gold/10 border border-passport-gold/20 flex items-center justify-center mb-10 shadow-[0_0_50px_rgba(212,175,55,0.2)]">
+        <Award className="text-passport-gold w-16 h-16" />
+      </div>
+      <h2 className="text-4xl font-black text-white mb-2 tracking-tight">{title}</h2>
+      {sub && <p className="text-lg text-passport-gold-soft italic mb-2">{sub}</p>}
+      {meta && <p className="text-sm font-bold text-passport-gold-soft uppercase tracking-[0.2em]">{meta}</p>}
+    </div>
+  );
+}
+
+function OutroSlide({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <h2 className="text-5xl font-black text-white leading-tight mb-6 tracking-tighter">{title}</h2>
+      <p className="text-xl text-passport-gold-soft font-medium italic">{sub}</p>
+      <Link
+        href="/passport"
+        className="mt-12 px-8 py-3 rounded-full bg-passport-gold text-passport-bg text-sm font-black hover:opacity-90 transition-opacity"
+      >
+        Back to Passport
+      </Link>
+    </div>
+  );
+}
+
+function renderSlide(slide: Slide) {
+  switch (slide.type) {
+    case 'intro':  return <IntroSlide title={slide.title!} sub={slide.sub!} />;
+    case 'stat':   return <StatSlide label={slide.label} value={slide.value} unit={slide.unit} icon={slide.icon} />;
+    case 'quote':  return <QuoteSlide title={slide.title!} sub={slide.sub!} />;
+    case 'highlight': return <HighlightSlide title={slide.title} sub={slide.sub} icon={slide.icon} />;
+    case 'achievement': return <AchievementSlide title={slide.title} sub={slide.sub} meta={slide.meta} />;
+    case 'outro':  return <OutroSlide title={slide.title!} sub={slide.sub!} />;
+    default:       return null;
+  }
+}
+
+/* ── Main component ──────────────────────────────────────────────────────── */
+
+export default function StoryDeck() {
+  const { user, profile, isLoading: isAuthLoading } = useAuth();
+  const { rosters } = useRoster();
+
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+
   const [current, setCurrent] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
-  const next = useCallback(() => {
-    if (current < SLIDES.length - 1) {
-      setCurrent(prev => prev + 1);
-      setProgress(0);
-    }
-  }, [current]);
+  // Refs to avoid stale closures in rAF loop
+  const currentRef = useRef(0);
+  const slidesLenRef = useRef(0);
+  const isPausedRef = useRef(false);
+  const progressRef = useRef(0);
+  const lastTickRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const prev = useCallback(() => {
-    if (current > 0) {
-      setCurrent(prev => prev - 1);
-      setProgress(0);
+  // Keep refs in sync
+  isPausedRef.current = isPaused;
+  slidesLenRef.current = slides.length;
+
+  /* ── Data fetch ────────────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    async function load() {
+      try {
+        const destinations = user ? await getLifetimeDestinations(user.uid) : [];
+        const stats = computeLifetimeStats(rosters, destinations.length);
+        const blockMinutes = rosters.reduce((s, r) => s + (r.totalBlockMinutes ?? 0), 0);
+        const displayName =
+          profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Crew Member';
+
+        const built = stats.sectors > 0 || stats.km > 0
+          ? buildSlides(displayName, stats.km, stats.sectors, blockMinutes, stats.citiesCollected)
+          : DEMO_SLIDES;
+
+        setSlides(built);
+      } finally {
+        setIsDataLoading(false);
+      }
     }
-  }, [current]);
+
+    load();
+  }, [isAuthLoading, user, profile, rosters]);
+
+  /* ── Audio setup ───────────────────────────────────────────────────────── */
+  useEffect(() => {
+    const audio = new Audio(MUSIC_SRC);
+    audio.loop = true;
+    audio.volume = 0.35;
+    audioRef.current = audio;
+
+    audio.play().catch(() => {
+      // Autoplay blocked — user can unmute manually
+    });
+
+    return () => {
+      audio.pause();
+      audio.src = '';
+    };
+  }, []);
 
   useEffect(() => {
-    if (isPaused) return;
+    if (!audioRef.current) return;
+    audioRef.current.muted = isMuted;
+  }, [isMuted]);
 
-    const interval = setInterval(() => {
-      setProgress(p => {
-        if (p >= 100) {
-          next();
-          return 0;
-        }
-        return p + 1;
-      });
-    }, 35); // 3.5s per slide
+  /* ── rAF progress ticker ───────────────────────────────────────────────── */
+  const tick = useCallback((timestamp: number) => {
+    if (isPausedRef.current) {
+      lastTickRef.current = null;
+      rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, [isPaused, next]);
+    if (lastTickRef.current === null) {
+      lastTickRef.current = timestamp;
+    }
 
-  const slide = SLIDES[current];
+    const delta = timestamp - lastTickRef.current;
+    lastTickRef.current = timestamp;
+
+    const next = progressRef.current + (delta / SLIDE_MS) * 100;
+
+    if (next >= 100) {
+      progressRef.current = 0;
+      setProgress(0);
+
+      if (currentRef.current < slidesLenRef.current - 1) {
+        currentRef.current += 1;
+        setCurrent(currentRef.current);
+      } else {
+        // Reached last slide — stop ticking
+        setProgress(100);
+        return;
+      }
+    } else {
+      progressRef.current = next;
+      setProgress(next);
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(() => {
+    if (slides.length === 0) return;
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [slides.length, tick]);
+
+  /* ── Navigation helpers ────────────────────────────────────────────────── */
+  const goNext = useCallback(() => {
+    if (currentRef.current >= slidesLenRef.current - 1) return;
+    currentRef.current += 1;
+    progressRef.current = 0;
+    lastTickRef.current = null;
+    setCurrent(currentRef.current);
+    setProgress(0);
+  }, []);
+
+  const goPrev = useCallback(() => {
+    if (currentRef.current <= 0) return;
+    currentRef.current -= 1;
+    progressRef.current = 0;
+    lastTickRef.current = null;
+    setCurrent(currentRef.current);
+    setProgress(0);
+  }, []);
+
+  /* ── Keyboard navigation ───────────────────────────────────────────────── */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight' || e.key === 'l') goNext();
+      if (e.key === 'ArrowLeft'  || e.key === 'j') goPrev();
+      if (e.key === ' ') { e.preventDefault(); setIsPaused(p => !p); }
+      if (e.key === 'm') setIsMuted(m => !m);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goNext, goPrev]);
+
+  /* ── Long-press to pause ───────────────────────────────────────────────── */
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function onPointerDown() {
+    longPressRef.current = setTimeout(() => setIsPaused(true), 180);
+  }
+  function onPointerUp() {
+    if (longPressRef.current) clearTimeout(longPressRef.current);
+    setIsPaused(false);
+  }
+
+  /* ── Touch swipe ───────────────────────────────────────────────────────── */
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    onPointerDown();
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    onPointerUp();
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    // Swipe left/right only if horizontal intent
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      dx < 0 ? goNext() : goPrev();
+    }
+  }
+
+  /* ── Loading state ─────────────────────────────────────────────────────── */
+  if (isDataLoading || slides.length === 0) {
+    return (
+      <div className="fixed inset-0 z-[500] bg-passport-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-2 border-passport-gold/30 border-t-passport-gold animate-spin" />
+          <p className="text-passport-secondary text-sm font-bold uppercase tracking-widest">Loading story…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const slide = slides[current];
 
   return (
-    <div className="fixed inset-0 z-[500] bg-passport-bg flex flex-col items-center justify-center p-4">
-      {/* Top Bars */}
-      <div className="absolute top-6 left-0 right-0 px-6 flex gap-1 z-50">
-        {SLIDES.map((_, i) => (
-          <div key={i} className="h-1 flex-1 bg-bg/20 rounded-full overflow-hidden">
-            <motion.div 
+    <div
+      className="fixed inset-0 z-[500] bg-passport-bg flex flex-col items-center justify-center select-none"
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* ── Progress bars ── */}
+      <div className="absolute top-6 left-0 right-0 px-5 flex gap-1 z-50 pointer-events-none">
+        {slides.map((_, i) => (
+          <div key={i} className="h-[3px] flex-1 bg-white/15 rounded-full overflow-hidden">
+            <motion.div
               className="h-full bg-passport-gold"
-              initial={{ width: 0 }}
               animate={{ width: i < current ? '100%' : i === current ? `${progress}%` : '0%' }}
-              transition={{ duration: 0.1 }}
+              transition={{ duration: 0.05 }}
             />
           </div>
         ))}
       </div>
 
-      {/* Header Actions */}
-      <div className="absolute top-12 left-6 right-6 flex justify-between items-center z-50">
+      {/* ── Header ── */}
+      <div className="absolute top-12 left-5 right-5 flex justify-between items-center z-50 pointer-events-none">
         <div className="flex items-center gap-3">
-           <div className="w-10 h-10 rounded-full bg-passport-gold text-passport-bg flex items-center justify-center font-black text-xs">
-              MA
-           </div>
-           <div>
-              <p className="text-xs font-black text-white leading-none">OTAROSTA</p>
-              <p className="text-[10px] font-bold text-passport-gold-soft uppercase tracking-widest mt-0.5">Passport &apos;26</p>
-           </div>
+          <div className="w-9 h-9 rounded-full bg-passport-gold text-passport-bg flex items-center justify-center font-black text-[11px]">
+            {(profile?.full_name || user?.displayName || 'MA').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-xs font-black text-white leading-none">OTAROSTA</p>
+            <p className="text-[10px] font-bold text-passport-gold-soft uppercase tracking-widest mt-0.5">
+              Passport &apos;{new Date().getFullYear().toString().slice(2)}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-           <button onClick={() => setIsPaused(!isPaused)} className="p-2 text-white/50 hover:text-white transition-colors">
-              {isPaused ? <Play size={20} /> : <Pause size={20} />}
-           </button>
-           <Link href="/passport" className="p-2 text-white/50 hover:text-white transition-colors">
-              <X size={24} />
-           </Link>
+
+        <div className="flex items-center gap-1 pointer-events-auto">
+          <button
+            onClick={e => { e.stopPropagation(); setIsMuted(m => !m); }}
+            className="p-2 text-white/50 hover:text-white transition-colors"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); setIsPaused(p => !p); }}
+            className="p-2 text-white/50 hover:text-white transition-colors"
+            aria-label={isPaused ? 'Play' : 'Pause'}
+          >
+            {isPaused ? <Play size={18} /> : <Pause size={18} />}
+          </button>
+          <Link
+            href="/passport"
+            onClick={e => e.stopPropagation()}
+            className="p-2 text-white/50 hover:text-white transition-colors"
+            aria-label="Close"
+          >
+            <X size={22} />
+          </Link>
         </div>
       </div>
 
-      {/* Slide Content */}
-      <div className="relative w-full max-w-lg aspect-[9/16] flex flex-col items-center justify-center text-center px-10">
+      {/* ── Slide content ── */}
+      <div className="relative w-full max-w-sm px-10 flex flex-col items-center justify-center text-center pointer-events-none">
         <AnimatePresence mode="wait">
           <motion.div
             key={current}
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 1.1, y: -20 }}
-            className="flex flex-col items-center"
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 1.02 }}
+            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="w-full"
           >
-            {slide.type === 'text' && (
-              <>
-                <h2 className="text-5xl font-black text-white leading-tight mb-6 tracking-tighter">{slide.title}</h2>
-                <p className="text-xl text-passport-gold-soft font-medium italic">{slide.sub}</p>
-              </>
-            )}
-
-            {slide.type === 'stat' && (
-              <>
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-passport-secondary mb-8">{slide.label}</p>
-                <h2 className="text-8xl font-serif text-white mb-4 tracking-tighter">{slide.value}</h2>
-                <p className="text-2xl font-black text-passport-gold uppercase tracking-widest italic">{slide.unit}</p>
-              </>
-            )}
-
-            {slide.type === 'quote' && (
-              <>
-                <h2 className="text-4xl font-serif italic text-white leading-relaxed mb-8">&ldquo;{slide.title}&rdquo;</h2>
-                <p className="text-lg text-passport-secondary font-medium">{slide.sub}</p>
-              </>
-            )}
-
-            {slide.type === 'highlight' && (
-              <>
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-passport-secondary mb-12">{slide.title}</p>
-                <div className="w-24 h-24 rounded-3xl bg-passport-gold/10 border border-passport-gold/20 flex items-center justify-center mb-10">
-                    <Globe className="text-passport-gold w-12 h-12" />
-                </div>
-                <h2 className="text-3xl font-black text-white mb-2">{slide.sub}</h2>
-                <p className="text-xl font-bold text-passport-gold-soft">{slide.meta}</p>
-              </>
-            )}
-
-            {slide.type === 'achievement' && (
-              <>
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-passport-secondary mb-12">Achievement Unlocked</p>
-                <div className="w-32 h-32 rounded-full bg-passport-gold/10 border border-passport-gold/20 flex items-center justify-center mb-10 shadow-[0_0_50px_rgba(212,175,55,0.2)]">
-                    <Award className="text-passport-gold w-16 h-16" />
-                </div>
-                <h2 className="text-4xl font-black text-white mb-2 tracking-tight">{slide.sub}</h2>
-                <p className="text-sm font-bold text-passport-gold-soft uppercase tracking-[0.2em]">{slide.meta}</p>
-              </>
-            )}
+            {renderSlide(slide)}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Navigation Areas (Invisible tap zones) */}
-      <div className="absolute inset-0 flex">
-        <div className="w-1/3 h-full" onClick={prev} />
-        <div className="w-2/3 h-full" onClick={next} />
+      {/* ── Invisible tap zones ── */}
+      <div className="absolute inset-0 flex z-40">
+        <div
+          className="w-1/3 h-full cursor-w-resize"
+          onClick={e => { e.stopPropagation(); goPrev(); }}
+        />
+        <div
+          className="w-2/3 h-full cursor-e-resize"
+          onClick={e => { e.stopPropagation(); goNext(); }}
+        />
       </div>
 
-      {/* Bottom Footer */}
-      <div className="absolute bottom-12 flex flex-col items-center gap-6 z-50">
-         <button className="bg-bg/10 backdrop-blur-md border border-white/20 text-white px-8 py-3 rounded-full flex items-center gap-2 text-sm font-bold hover:bg-bg/20 transition-all">
-            <Download size={16} />
-            Save slide
-         </button>
-         <p className="text-[10px] font-bold text-passport-secondary uppercase tracking-[0.4em]">Otarosta.com</p>
+      {/* ── Pause overlay ── */}
+      <AnimatePresence>
+        {isPaused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex items-center justify-center z-[45] pointer-events-none"
+          >
+            <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+              <Pause size={28} className="text-white" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Footer ── */}
+      <div className="absolute bottom-10 flex flex-col items-center gap-3 z-50 pointer-events-none">
+        <p className="text-[10px] font-bold text-passport-secondary uppercase tracking-[0.4em]">
+          {current + 1} / {slides.length}
+        </p>
+        <p className="text-[10px] font-bold text-passport-secondary/50 uppercase tracking-[0.3em]">Otarosta.com</p>
       </div>
     </div>
   );
-};
-
-// Simplified icon helper for the component
-const Globe = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-);
-
-const Award = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...props}>
-    <path d="M12 15l-2 5 2-1 2 1-2-5z" />
-    <path d="M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14z" />
-    <path d="M8.21 13.89L7 23l5-3 5 9-1.21-9.11" />
-  </svg>
-);
-
-export default StoryDeck;
+}
