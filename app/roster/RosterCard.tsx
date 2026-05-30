@@ -16,6 +16,8 @@ import { useState } from "react";
 type Role   = "pilot" | "cabin";
 type Period = "month" | "half" | "year";
 
+export interface StampItem { iata: string; flag: string }
+
 export interface RosterCardProps {
   defaultRole?:      Role;
   defaultPeriod?:    Period;
@@ -23,6 +25,10 @@ export interface RosterCardProps {
   profileOverride?:  Profile;
   /** Restrict which period tabs are shown. Defaults to all three. */
   availablePeriods?: Period[];
+  /** Lifetime earned stamp destinations — shows second stamps card when provided. */
+  allStamps?:        StampItem[];
+  /** Total stamps in the catalog (denominator). */
+  totalStamps?:      number;
 }
 
 export type { Profile, PeriodData, Period };
@@ -275,7 +281,18 @@ const pctDelta = (now: number, prev: number) => Math.round(((now - prev) / prev)
 
 // ---------- component --------------------------------------------------------
 
-export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "month", profileOverride, availablePeriods }: RosterCardProps) {
+const MAX_STAMPS_GRID = 32; // 4 cols × 8 rows
+
+function handleShare() {
+  const url = window.location.href;
+  if (navigator.share) {
+    navigator.share({ title: 'My Roster Card', url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
+}
+
+export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "month", profileOverride, availablePeriods, allStamps, totalStamps = 72 }: RosterCardProps) {
   const [role, setRole]     = useState<Role>(defaultRole);
   const [period, setPeriod] = useState<Period>(defaultPeriod);
 
@@ -326,6 +343,7 @@ export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "mon
               </div>
             </div>
             <button
+              onClick={handleShare}
               className="grid h-9 w-9 place-items-center rounded-full bg-white/70 text-[#222] ring-1 ring-black/5 backdrop-blur transition hover:bg-white"
               aria-label="Share"
             >
@@ -438,9 +456,9 @@ export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "mon
             />
             <HighlightCard
               accent="#00A699" bg="#E1F5EE"
-              icon={ICONS.heart} label="Favorite stay"
-              title={data.favorite.city}
-              value={data.favorite.rating != null ? `★ ${data.favorite.rating.toFixed(1)}` : data.favorite.code}
+              icon={ICONS.pin} label="Most visited city"
+              title={data.destinations[0]?.city ?? '—'}
+              value={data.destinations[0] ? `${data.destinations[0].visits} visits · ${data.destinations[0].code}` : '—'}
             />
           </section>
 
@@ -451,17 +469,86 @@ export default function RosterCard({ defaultRole = "pilot", defaultPeriod = "mon
                 <Icon d={ICONS.plane} className="h-3 w-3" />
               </span>
               <span className="font-semibold tracking-tight text-[#222]">
-                roster<span className="text-[#FF385C]">.io</span>
+                otarosta<span className="text-[#FF385C]">.com</span>
               </span>
               <span className="text-[#DDDDDD]">|</span>
               <span>{profile.handle}</span>
             </div>
-            <button className="inline-flex items-center gap-1 rounded-full bg-[#222] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black">
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-1 rounded-full bg-[#222] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black"
+            >
               Share story <Icon d={ICONS.arrowRight} className="h-3 w-3" />
             </button>
           </footer>
         </div>
       </div>
+
+      {/* ── Second card: Stamps collection ── */}
+      {allStamps && allStamps.length > 0 && (
+        <div
+          className="relative w-full max-w-[420px] aspect-[9/16] overflow-hidden rounded-[36px] bg-[#0E1E30] text-white
+                     shadow-[0_30px_80px_-20px_rgba(0,0,0,0.35),0_8px_24px_-12px_rgba(0,0,0,0.2)]
+                     ring-1 ring-white/10"
+          style={{ fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif" }}
+        >
+          <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[#C8A84B]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-[#C8A84B]/8 blur-3xl" />
+
+          <div className="relative flex h-full flex-col p-6">
+            {/* Header */}
+            <header className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#C8A84B]/70 mb-1">Otarosta</p>
+                <h2 className="text-[22px] font-semibold tracking-tight leading-tight">Stamp Collection</h2>
+              </div>
+              <div className="text-right">
+                <p className="text-[28px] font-bold leading-none tracking-tight text-[#C8A84B]">{allStamps.length}</p>
+                <p className="text-[11px] text-white/50 font-medium">/ {totalStamps} stamps</p>
+              </div>
+            </header>
+
+            {/* Dashed divider */}
+            <div className="w-full border-t border-dashed border-[#C8A84B]/30 mb-4" />
+
+            {/* Stamps grid or count fallback */}
+            {allStamps.length <= MAX_STAMPS_GRID ? (
+              <div className="grid grid-cols-4 gap-2 flex-1 content-start">
+                {allStamps.map(({ iata, flag }) => (
+                  <div
+                    key={iata}
+                    className="flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-white/5 ring-1 ring-white/10 py-2.5 px-1"
+                  >
+                    <span className="text-[18px] leading-none">{flag}</span>
+                    <span className="text-[9px] font-bold tracking-wider text-white/80 mt-0.5">{iata}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3">
+                <div className="flex flex-col items-center justify-center w-44 h-44 rounded-full border-2 border-dashed border-[#C8A84B]/40 bg-[#C8A84B]/5">
+                  <p className="text-[64px] font-bold leading-none tracking-tight text-[#C8A84B]">{allStamps.length}</p>
+                  <p className="text-[13px] font-medium text-white/50">stamps</p>
+                </div>
+                <p className="text-[14px] text-white/40 font-medium">out of {totalStamps} collected</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="mt-auto pt-4 flex items-center justify-between border-t border-dashed border-[#C8A84B]/20">
+              <div className="flex items-center gap-1.5 text-[11px] text-white/40">
+                <span className="inline-grid h-5 w-5 place-items-center rounded-full bg-[#FF385C] text-white">
+                  <Icon d={ICONS.plane} className="h-3 w-3" />
+                </span>
+                <span className="font-semibold tracking-tight text-white/70">
+                  otarosta<span className="text-[#FF385C]">.com</span>
+                </span>
+              </div>
+              <span className="text-[11px] text-white/30">{profile.handle}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

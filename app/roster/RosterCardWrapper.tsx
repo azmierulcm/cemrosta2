@@ -1,13 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRoster } from '@/lib/contexts/RosterContext';
-import { DESTINATION_CATALOG } from '@/lib/data/destination-catalog';
+import { DESTINATION_CATALOG, CATALOG_SIZE } from '@/lib/data/destination-catalog';
 import { getCoordinates } from '@/lib/utils/geo/haversine';
-import type { Profile, PeriodData, Period } from './RosterCard';
+import { getLifetimeDestinations } from '@/lib/actions/destinations';
+import type { Profile, PeriodData, Period, StampItem } from './RosterCard';
 import RosterCard from './RosterCard';
 import type { DutyEvent } from '@/lib/types';
 
@@ -194,6 +195,14 @@ function buildFromSummary(
 export default function RosterCardWrapper() {
   const { user, profile, isLoading: isAuthLoading } = useAuth();
   const { rosters, activeRoster, isLoading, isLoadingList } = useRoster();
+  const [allStamps, setAllStamps] = useState<StampItem[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    getLifetimeDestinations(user.uid).then((dests) => {
+      setAllStamps(dests.map((d) => ({ iata: d.iata, flag: countryFlag(d.iata) })));
+    }).catch(() => {});
+  }, [user]);
 
   const isSpinning = isAuthLoading || (!!user && (isLoadingList || isLoading));
 
@@ -307,6 +316,8 @@ export default function RosterCardWrapper() {
       profileOverride={realProfile}
       defaultPeriod="month"
       availablePeriods={availablePeriods}
+      allStamps={allStamps}
+      totalStamps={CATALOG_SIZE}
     />
   );
 }
