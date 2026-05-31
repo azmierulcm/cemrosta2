@@ -12,6 +12,7 @@
   "dependencies": {
     "@sentry/nextjs": "^10.53.1",
     "@types/luxon": "^3.7.1",
+    "@types/web-push": "^3.6.4",
     "firebase": "^12.13.0",
     "firebase-admin": "^13.10.0",
     "framer-motion": "^12.38.0",
@@ -29,7 +30,8 @@
     "react-leaflet": "^5.0.0",
     "react-simple-maps": "^3.0.0",
     "resend": "^6.12.3",
-    "unpdf": "^1.6.2"
+    "unpdf": "^1.6.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
