@@ -23,6 +23,7 @@ import type { DutyEvent } from '@/lib/types';
 
 export type DutyStatus =
   | 'flight'
+  | 'layover'
   | 'standby'
   | 'training'
   | 'office'
@@ -68,7 +69,7 @@ export interface Duty {
 const EVENT_STATUS: Record<string, DutyStatus> = {
   FLIGHT:   'flight',
   STANDBY:  'standby',
-  LAYOVER:  'standby',
+  LAYOVER:  'layover',
   OFF:      'off',
   TRAINING: 'training',
   GROUND:   'training',
@@ -168,6 +169,7 @@ const STATUS_META: Record<DutyStatus, {
   chipTone: string;
 }> = {
   flight:   { band: 'bg-duty-flight-bg text-duty-flight-text',   label: 'Duty',    chipTone: 'flight'  },
+  layover:  { band: 'bg-duty-flight-bg text-duty-flight-text',   label: 'Layover', chipTone: 'flight'  },
   office:   { band: 'bg-duty-flight-bg text-duty-flight-text',   label: 'Office',  chipTone: 'flight'  },
   standby:  { band: 'bg-duty-standby-bg text-duty-standby-text', label: 'Standby', chipTone: 'standby' },
   off:      { band: 'bg-duty-off-bg text-duty-off-text',         label: 'Off',     chipTone: 'off'     },
@@ -266,6 +268,7 @@ function FlightRows({ f, compact }: { f: TileFlight; compact: boolean }) {
 /** Centred label for non-flight duty body. */
 function restLabel(d: Duty): string {
   switch (d.status) {
+    case 'layover':  return `Layover · ${d.from ?? ''}`.replace(/· $/, '').trim();
     case 'standby':  return `Standby · ${d.from ?? 'KUL'}`;
     case 'training': return d.description ?? 'Simulator';
     case 'office':   return `Office · ${d.from ?? 'KUL'}`;

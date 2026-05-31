@@ -69,8 +69,10 @@ export async function scheduleFlightReminders(
   staleSnap.docs.forEach((doc) => batch.delete(doc.ref));
 
   // ── 2. Create new reminders ───────────────────────────────────────────────
+  // Only KUL departures — crew on nightstop at another station are already
+  // on-location and don't need a 6-hour wake-up reminder.
   const flights = events.filter(
-    (e) => e.type === 'FLIGHT' && e.date && e.std,
+    (e) => e.type === 'FLIGHT' && e.date && e.std && e.depPort === 'KUL',
   );
 
   for (const event of flights) {

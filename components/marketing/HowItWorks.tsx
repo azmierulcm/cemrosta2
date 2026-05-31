@@ -37,7 +37,7 @@ function UploadPreview() {
 function RosterPreview() {
   const tiles = [
     { date: '14', band: 'bg-sky-50 text-sky-700',    label: 'Duty',    from: 'KUL', to: 'LHR', flight: 'MH001', time: '23:50 → 06:10+' },
-    { date: '15', band: 'bg-amber-50 text-amber-700', label: 'Layover', from: '',    to: '',     flight: '',      time: 'London Heathrow' },
+    { date: '15', band: 'bg-sky-50 text-sky-700',    label: 'Layover', from: '',    to: '',     flight: '',      time: 'London Heathrow' },
     { date: '16', band: 'bg-sky-50 text-sky-700',    label: 'Duty',    from: 'LHR', to: 'KUL', flight: 'MH002', time: '13:30 → 08:20+' },
     { date: '17', band: 'bg-green-50 text-green-700', label: 'Rest',   from: '',    to: '',     flight: '',      time: 'Rest day' },
   ];
