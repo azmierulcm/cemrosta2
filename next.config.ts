@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   compress: true,
   reactStrictMode: true,
 
+  // Packages that use native Node.js modules — must not be bundled by Turbopack
+  serverExternalPackages: ['web-push'],
+
   // Trim unused locales from the bundle
   i18n: undefined,
 
